@@ -1,9 +1,9 @@
-import pygame, sys
-from configuration.Configuration import Configuration
-from controller.titlescreen.TitleScreenController import TitleScreenController
+import sys
 
-# first, initialize our configuration since it's going to be used practically everywhere
-configuration = Configuration()
+import pygame
+
+from configuration import configuration
+import controller
 
 # now, init pygame and set the screen size
 pygame.init()
@@ -11,7 +11,7 @@ screen = pygame.display.set_mode(configuration.get_screen_size())
 clock = pygame.time.Clock()
 
 # we start at the title screen
-controller = TitleScreenController()
+controller = controller.TitleScreenController()
 controller.handle_forward_controller_transition()
 try:
     while not controller.should_exit:

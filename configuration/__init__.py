@@ -1,2 +1,3 @@
-from configuration.Configuration import Configuration
+from main import Configuration
+
 configuration = Configuration()
