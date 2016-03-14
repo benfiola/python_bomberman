@@ -31,7 +31,6 @@ class SlideAnimationData(AnimationData):
         self.curr = source
         self.source = source
         self.target = target
-        self.speed = ((target[0]-source[0])/duration, (target[1]-source[1])/duration)
-
+        self.speed = ((target[0]-source[0])/float(duration), (target[1]-source[1])/float(duration))
 
 

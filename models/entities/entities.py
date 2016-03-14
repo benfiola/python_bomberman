@@ -1,6 +1,6 @@
 class AbstractEntity(object):
     def __init__(self):
-        pass
+        self.sprite_hash = None
 
 
 class MenuOptionEntity(AbstractEntity):
@@ -10,6 +10,13 @@ class MenuOptionEntity(AbstractEntity):
         self.next_controller_class = next_controller_class
         self.exit_selection = exit_selection
         pass
+
+
+class MenuOptionSelectionEntity(AbstractEntity):
+    def __init__(self, curr_selection, index):
+        self.prev_selection = None
+        self.curr_selection = curr_selection
+        self.sel_index = index
 
 
 class SelectableOptionEntity(AbstractEntity):

@@ -1,11 +1,11 @@
-from time import time
-
 from pygame import display
+
 from pygame import Surface
-from time import time
+
 from colors import *
-from widgets import *
+from components import *
 from animations import *
+
 
 class AbstractView(object):
     VIEW_TRANSITION_TIME = 100
@@ -13,12 +13,13 @@ class AbstractView(object):
     def __init__(self, backing_model, bg_color=Colors.BLACK):
         self.surface = None
         self.backing_model = backing_model
-        self.layer_groups = []
+        self.model_sprite_dict = {}
+        self.containers = []
         self.bg_color = bg_color
 
     # initialize_surface is called prior to a view transition
     # it basically prepares a screen
-    def initialize_surface(self, model):
+    def initialize_surface(self):
         curr_surface = display.get_surface()
         self.surface = Surface(curr_surface.get_size())
         self.surface.fill(self.bg_color)
@@ -26,11 +27,11 @@ class AbstractView(object):
     # called on every cycle to update the current view
     def update(self):
         rects = []
-        for layer_group in self.layer_groups:
-            for layer_index in layer_group.layers():
-                for sprite in layer_group.get_sprites_from_layer(layer_index):
+        for container in self.containers:
+            for container_layer_index in container.layers():
+                for sprite in container.get_sprites_from_layer(container_layer_index):
                     sprite.update()
-            rects.extend(layer_group.draw(display.get_surface()))
+            rects.extend(container.draw(display.get_surface()))
         display.update(rects)
 
     # prior to animating away from this view, we save what we have to our surface.
@@ -44,39 +45,40 @@ class AbstractView(object):
     # i decided to make this animation blocking, and it basically serves to perform
     # a better-than-nothing sliding animation between two screens.
     def slide_right(self):
-        start_time = time() * 1000
-        duration = (time()*1000) - start_time
+        start_time = time.time() * 1000
+        duration = (time.time() * 1000) - start_time
         width = display.get_surface().get_size()[0]
         old_surface = display.get_surface().copy()
 
         while duration < AbstractView.VIEW_TRANSITION_TIME:
             progress = duration / AbstractView.VIEW_TRANSITION_TIME
-            x_offset = (-width)+(width*progress)
+            x_offset = (-width) + (width * progress)
             old_surface_x_offset = x_offset + width
             display.get_surface().blit(old_surface, (old_surface_x_offset, 0))
             display.get_surface().blit(self.surface, (x_offset, 0))
             display.flip()
-            duration = (time.time()*1000) - start_time
+            duration = (time.time() * 1000) - start_time
         display.get_surface().blit(self.surface, (0, 0))
         display.flip()
 
     # same as above, but in opposite direction.  could generalize this, am lazy.
     def slide_left(self):
         start_time = time.time() * 1000
-        duration = (time.time()*1000) - start_time
+        duration = (time.time() * 1000) - start_time
         width = display.get_surface().get_size()[0]
         old_surface = display.get_surface().copy()
 
         while duration < AbstractView.VIEW_TRANSITION_TIME:
             progress = duration / AbstractView.VIEW_TRANSITION_TIME
-            x_offset = width-(width*progress)
+            x_offset = width - (width * progress)
             old_surface_x_offset = x_offset - width
             display.get_surface().blit(old_surface, (old_surface_x_offset, 0))
             display.get_surface().blit(self.surface, (x_offset, 0))
             display.flip()
-            duration = (time.time()*1000) - start_time
+            duration = (time.time() * 1000) - start_time
         display.get_surface().blit(self.surface, (0, 0))
         display.flip()
+
 
 class MainMenuView(AbstractView):
     def __init__(self, backing_model):
@@ -85,38 +87,31 @@ class MainMenuView(AbstractView):
         self.container = None
         self.selection = None
 
-    def initialize_surface(self, model):
-        super(MainMenuView, self).initialize_surface(model)
-
-        # prepare the title
-        self.title = LabelWidget("Main Menu", 36, Colors.WHITE)
+    def initialize_surface(self):
+        super(MainMenuView, self).initialize_surface()
         surface_center = self.surface.get_rect().center
-        title_center = self.title.rect.center
-        title_position = (surface_center[0]-title_center[0], 0)
+        surface_size = self.surface.get_rect().size
 
-        # prepare the menu options container
-        font_size = 24
-        option_widgets = []
-        for option in model.options:
-            curr_widget = LabelWidget(option.text, font_size, Colors.WHITE, padding=(12,12,12,12))
-            option_widgets.append(curr_widget)
+        title = TextContainer("Main Menu", 48, Colors.WHITE, self.bg_color)
+        title.set_midtop((surface_center[0], 0))
 
-        self.container = MenuContainer(option_widgets, Colors.BLACK)
-        container_center = self.container.rect.center
-        container_position = (surface_center[0]-container_center[0], surface_center[1])
+        options = []
+        for option_model in self.backing_model.options:
+            component = TextComponent(option_model.text, 36, Colors.WHITE, Colors.BLACK)
+            self.model_sprite_dict[option_model] = component
+            options.append(component)
+        menu = MenuContainer(options, Colors.BLACK, Colors.RED, self.backing_model.selection)
+        menu.set_midbottom((surface_center[0], surface_size[1] - 36), shift_y=True)
+        self.model_sprite_dict[self.backing_model.selection] = menu.selection
+        self.containers.extend([title, menu])
 
-        title_layer_group = self.title.to_layer_group()
-        container_layer_group = self.container.to_layer_group()
-        title_layer_group.position(title_position)
-        container_layer_group.position(container_position)
-        title_layer_group.draw(self.surface)
-        container_layer_group.draw(self.surface)
+    def option_change(self):
+        selection_model = self.backing_model.selection
+        selection_sprite = self.model_sprite_dict[selection_model]
+        target_sprite = self.model_sprite_dict[selection_model.curr_selection]
+        selection_sprite.animation_data = SlideAnimationData(100, selection_sprite.rect.topleft,
+                                                             target_sprite.rect.topleft)
 
-        self.layer_groups.append(self.title.to_layer_group())
-        self.layer_groups.append(self.container.to_layer_group())
-
-    def option_change(self, model):
-        self.container.option_change(model.selection)
 
 class TitleScreenView(AbstractView):
     def __init__(self, backing_model):
@@ -124,75 +119,75 @@ class TitleScreenView(AbstractView):
         self.title = None
         self.subtext = None
 
-    def initialize_surface(self, model):
-        super(TitleScreenView, self).initialize_surface(model)
-        self.title = LabelWidget("Bombenman", 72, Colors.WHITE)
-        self.subtext = LabelWidget("Press enter", 36, Colors.WHITE)
-
+    def initialize_surface(self):
+        super(TitleScreenView, self).initialize_surface()
         surface_center = self.surface.get_rect().center
-        title_center = self.title.rect.center
-        subtext_center = self.subtext.rect.center
+        surface_size = self.surface.get_rect().size
 
-        title_position = (surface_center[0]-title_center[0],0)
-        subtext_position = (surface_center[0]-subtext_center[0], surface_center[1] + (surface_center[1]/2))
+        title = TextContainer("Bomberman", 72, Colors.WHITE, self.bg_color)
+        subtext = TextContainer("Press enter to continue", 36, Colors.WHITE, self.bg_color)
+        title.set_midtop((surface_center[0], 0))
+        subtext.set_midbottom((surface_center[0], surface_size[1]))
+        self.containers.extend([title, subtext])
 
-        title_layer_group = self.title.to_layer_group(title_position)
-        subtext_layer_group = self.subtext.to_layer_group(subtext_position)
-        self.layer_groups.extend([title_layer_group, subtext_layer_group])
 
 class MultiplayerView(AbstractView):
     def __init__(self, backing_model):
         super(MultiplayerView, self).__init__(backing_model, bg_color=Colors.WHITE)
+        surface_center = self.surface.get_rect().center
+
+        title = TextContainer("Multiplayer View", 48, Colors.WHITE, self.bg_color)
+        title.set_midtop((surface_center[0], 0))
+        self.containers.extend([title])
+
 
 class MultiplayerOptionsView(AbstractView):
     def __init__(self, backing_model):
         super(MultiplayerOptionsView, self).__init__(backing_model=backing_model, bg_color=Colors.GRAY)
 
-    def initialize_surface(self, model):
-        super(MultiplayerOptionsView, self).initialize_surface(model)
-        title_widget = LabelWidget("Multiplayer Options", 36, Colors.BLACK)
-
+    def initialize_surface(self):
+        super(MultiplayerOptionsView, self).initialize_surface()
         surface_center = self.surface.get_rect().center
-        title_center = title_widget.rect.center
 
-        self.surface.blit(title_widget.image, (surface_center[0]-title_center[0], 0))
+        title = TextContainer("Multiplayer Options View", 48, Colors.WHITE, self.bg_color)
+        title.set_midtop((surface_center[0], 0))
+        self.containers.extend([title])
+
 
 class SinglePlayerOptionsView(AbstractView):
     def __init__(self, backing_model):
         super(SinglePlayerOptionsView, self).__init__(backing_model=backing_model, bg_color=Colors.WHITE)
 
-    def initialize_surface(self, model):
-        super(SinglePlayerOptionsView, self).initialize_surface(model)
-        title_widget = LabelWidget("Single Player Options", 36, Colors.BLACK)
-
+    def initialize_surface(self):
+        super(SinglePlayerOptionsView, self).initialize_surface()
         surface_center = self.surface.get_rect().center
-        title_center = title_widget.rect.center
 
-        self.surface.blit(title_widget.image, (surface_center[0]-title_center[0], 0))
+        title = TextContainer("Single Player Options View", 48, Colors.BLACK, self.bg_color)
+        title.set_midtop((surface_center[0], 0))
+        self.containers.extend([title])
+
 
 class SinglePlayerView(AbstractView):
     def __init__(self, backing_model):
         super(OptionsView, self).__init__(backing_model=backing_model, bg_color=Colors.RED)
 
-    def initialize_surface(self, model):
-        super(SinglePlayerView, self).initialize_surface(model)
-        title_widget = LabelWidget("Single Player", 36, Colors.BLACK)
-
+    def initialize_surface(self):
+        super(SinglePlayerView, self).initialize_surface()
         surface_center = self.surface.get_rect().center
-        title_center = title_widget.rect.center
 
-        self.surface.blit(title_widget.image, (surface_center[0]-title_center[0], 0))
+        title = TextContainer("Single Player View", 48, Colors.WHITE, self.bg_color)
+        title.set_midtop((surface_center[0], 0))
+        self.containers.extend([title])
 
 
 class OptionsView(AbstractView):
     def __init__(self, backing_model):
         super(OptionsView, self).__init__(backing_model=backing_model, bg_color=Colors.GREEN)
 
-    def initialize_surface(self, model):
-        super(OptionsView, self).initialize_surface(model)
-        title_widget = LabelWidget("Options", 36, Colors.BLACK)
-
+    def initialize_surface(self):
+        super(OptionsView, self).initialize_surface()
         surface_center = self.surface.get_rect().center
-        title_center = title_widget.rect.center
 
-        self.surface.blit(title_widget.image, (surface_center[0]-title_center[0], 0))
+        title = TextContainer("Options View", 48, Colors.WHITE, self.bg_color)
+        title.set_midtop((surface_center[0], 0))
+        self.containers.extend([title])

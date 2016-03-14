@@ -9,21 +9,27 @@ class AbstractModel(object):
 class MainMenuModel(AbstractModel):
     def __init__(self):
         super(MainMenuModel, self).__init__()
-        self.selection = 0
+        sel_index = 0
         self.options = [SinglePlayerEntity(), MultiplayerEntity(), OptionsEntity(), ExitEntity()]
+        self.selection = MenuOptionSelectionEntity(self.options[sel_index], sel_index)
 
     def next_option(self):
-        self.selection += 1
-        if self.selection >= len(self.options):
-            self.selection = 0
+        self.selection.prev_selection = self.selection.curr_selection
+        self.selection.sel_index += 1
+        if self.selection.sel_index >= len(self.options):
+            self.selection.sel_index = 0
+        self.selection.curr_selection = self.options[self.selection.sel_index]
+
 
     def previous_option(self):
-        self.selection -= 1
-        if self.selection < 0:
-            self.selection = (len(self.options) - 1)
+        self.selection.prev_selection = self.selection.curr_selection
+        self.selection.sel_index -= 1
+        if self.selection.sel_index < 0:
+            self.selection.sel_index = (len(self.options) - 1)
+        self.selection.curr_selection = self.options[self.selection.sel_index]
 
     def get_selection(self):
-        return self.options[self.selection]
+        return self.selection.curr_selection
 
 
 class OptionsModel(AbstractModel):

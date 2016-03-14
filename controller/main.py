@@ -22,7 +22,7 @@ class AbstractController(object):
         self.view.update()
 
     def handle_forward_controller_transition(self):
-        self.view.initialize_surface(self.model)
+        self.view.initialize_surface()
         self.view.slide_left()
 
     def handle_backward_controller_transition(self):
@@ -46,10 +46,10 @@ class MainMenuController(AbstractController):
                     self.next_controller = selection.next_controller_class(self)
             elif event.key == pygame.K_UP:
                 self.model.previous_option()
-                self.view.option_change(self.model)
+                self.view.option_change()
             elif event.key == pygame.K_DOWN:
                 self.model.next_option()
-                self.view.option_change(self.model)
+                self.view.option_change()
 
 
 class MultiplayerController(AbstractController):
