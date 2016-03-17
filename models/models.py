@@ -1,4 +1,5 @@
 from entities.mainmenu import *
+from configuration import configuration
 
 
 class AbstractModel(object):
@@ -9,9 +10,8 @@ class AbstractModel(object):
 class MainMenuModel(AbstractModel):
     def __init__(self):
         super(MainMenuModel, self).__init__()
-        sel_index = 0
         self.options = [SinglePlayerEntity(), MultiplayerEntity(), OptionsEntity(), ExitEntity()]
-        self.selection = MenuSelectionEntity(self.options[sel_index], sel_index)
+        self.selection = MenuSelectionEntity(self.options[0], 0)
 
     def next_option(self):
         self.selection.prev_selection = self.selection.curr_selection
@@ -19,7 +19,6 @@ class MainMenuModel(AbstractModel):
         if self.selection.sel_index >= len(self.options):
             self.selection.sel_index = 0
         self.selection.curr_selection = self.options[self.selection.sel_index]
-
 
     def previous_option(self):
         self.selection.prev_selection = self.selection.curr_selection
@@ -35,6 +34,41 @@ class MainMenuModel(AbstractModel):
 class OptionsModel(AbstractModel):
     def __init__(self):
         super(OptionsModel, self).__init__()
+        self.options = []
+        for key in configuration.dict:
+            curr_config = configuration.dict[key]
+            if curr_config.options is not None:
+                self.options.append(PredefinedConfigurationEntity(curr_config.key, curr_config.text, curr_config.value,
+                                                                  curr_config.options))
+            else:
+                self.options.append(InputConfigurationEntity(curr_config.key, curr_config.text, curr_config.value))
+        self.selection = MenuSelectionEntity(self.options[0], 0)
+
+    def next_option(self):
+        self.selection.prev_selection = self.selection.curr_selection
+        self.selection.sel_index += 1
+        if self.selection.sel_index >= len(self.options):
+            self.selection.sel_index = 0
+        self.selection.curr_selection = self.options[self.selection.sel_index]
+
+    def previous_option(self):
+        self.selection.prev_selection = self.selection.curr_selection
+        self.selection.sel_index -= 1
+        if self.selection.sel_index < 0:
+            self.selection.sel_index = (len(self.options) - 1)
+        self.selection.curr_selection = self.options[self.selection.sel_index]
+
+    def next_value(self):
+        if isinstance(self.selection.curr_selection, PredefinedConfigurationEntity):
+            self.selection.curr_selection.next_value()
+
+    def previous_value(self):
+        if isinstance(self.selection.curr_selection, PredefinedConfigurationEntity):
+            self.selection.curr_selection.previous_value()
+
+    def handle_alphanumeric_input(self, input):
+        if isinstance(self.selection.curr_selection, InputConfigurationEntity):
+            self.selection.curr_selection.handle_input(input)
 
 
 class SinglePlayerModel(AbstractModel):

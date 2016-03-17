@@ -20,7 +20,7 @@ class Configuration(object):
     CONFIG_FILE = "config.json"
 
     def __init__(self):
-        self.configuration = ConfigurationData.default_configuration()
+        self.dict = ConfigurationData.default_configuration()
 
         # if we have a config file, we replace our default configuration
         # with whatever values are in the file
@@ -34,8 +34,8 @@ class Configuration(object):
     def write_configuration_to_file(self):
         config_file = open(Configuration.CONFIG_FILE, "w")
         to_write = {}
-        for key in self.configuration:
-            to_write[key] = self.configuration[key].value
+        for key in self.dict:
+            to_write[key] = self.dict[key].value
         config_file.write(json.dumps(to_write))
         config_file.close()
 
@@ -45,9 +45,9 @@ class Configuration(object):
         config_file.close()
         loaded_data = json.loads(data)
         for key in loaded_data:
-            if key in self.configuration:
+            if key in self.dict:
                 value = loaded_data[key]
-                self.configuration[key].value = value
+                self.dict[key].value = value
 
     def get_screen_size(self):
-        return self.configuration[ConfigurationData.Keys.SCREEN_SIZE]
+        return self.dict[ConfigurationData.Keys.SCREEN_SIZE]
