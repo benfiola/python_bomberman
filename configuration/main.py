@@ -1,67 +1,53 @@
 import json, os
 
+class ConfigurationData:
+    class Keys:
+        SCREEN_SIZE="screen_size"
 
-class ConfigurationKeys(object):
-    SCREEN_SIZE = "screen_size"
+    def __init__(self, key, value, text, options=None):
+        self.key = key
+        self.value = value
+        self.text = text
+        self.options = options
 
+    @staticmethod
+    def default_configuration():
+        return {
+            ConfigurationData.Keys.SCREEN_SIZE:ConfigurationData(ConfigurationData.Keys.SCREEN_SIZE, (800, 600), "Screen Size", [(640, 480), (800, 600), (1024, 768)])
+        }
 
 class Configuration(object):
     CONFIG_FILE = "config.json"
 
     def __init__(self):
-        self.configuration = {}
-        default_configuration = self.default_configuration()
+        self.configuration = ConfigurationData.default_configuration()
 
-        # if we don't have a config file, make it and store the default configuration
-        if not os.path.isfile(Configuration.CONFIG_FILE):
-            self.configuration = default_configuration
-            self.write_configuration_to_file()
-        else:
-            # if we do have a config file, try to read from it.
-            # if it fails, rewrite the config file with default values
-            try:
-                self.read_configuration_from_file()
-            except ValueError:
-                self.configuration = default_configuration
-                self.write_configuration_to_file()
+        # if we have a config file, we replace our default configuration
+        # with whatever values are in the file
+        if os.path.isfile(Configuration.CONFIG_FILE):
+            self.read_configuration_from_file()
 
-        # add any new configuration entries from our default ocnfiguration into
-        # the configuration we've read from the file.
-        should_rewrite_file = False
-        for key in default_configuration:
-            if key not in self.configuration:
-                should_rewrite_file = True
-                self.configuration[key] = default_configuration[key]
-
-        # if our read configuration contains entries that don't exist in our
-        # default configuration, then we erase them from dictionary and rewrite
-        # the file.
-        keys_to_remove = []
-        for key in self.configuration:
-            if key not in default_configuration:
-                keys_to_remove.append(key)
-        for key in keys_to_remove:
-            should_rewrite_file = True
-            self.configuration.pop(key, None)
-
-        if should_rewrite_file:
-            self.write_configuration_to_file()
-
-    def default_configuration(self):
-        return {
-            ConfigurationKeys.SCREEN_SIZE: (800, 600)
-        }
+        # finally, we write our configuration back out - this cleans up the file
+        # from having old options that no longer exist.
+        self.write_configuration_to_file()
 
     def write_configuration_to_file(self):
         config_file = open(Configuration.CONFIG_FILE, "w")
-        config_file.write(json.dumps(self.configuration))
+        to_write = {}
+        for key in self.configuration:
+            to_write[key] = self.configuration[key].value
+        config_file.write(json.dumps(to_write))
         config_file.close()
 
     def read_configuration_from_file(self):
         config_file = open(Configuration.CONFIG_FILE, "r")
         data = config_file.read()
         config_file.close()
-        self.configuration = json.loads(data)
+        loaded_data = json.loads(data)
+        for key in loaded_data:
+            if key in self.configuration:
+                value = loaded_data[key]
+                self.configuration[key].value = value
 
     def get_screen_size(self):
-        return self.configuration[ConfigurationKeys.SCREEN_SIZE]
+        return self.configuration[ConfigurationData.Keys.SCREEN_SIZE]

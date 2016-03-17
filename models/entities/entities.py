@@ -12,13 +12,24 @@ class MenuOptionEntity(AbstractEntity):
         pass
 
 
-class MenuOptionSelectionEntity(AbstractEntity):
+class MenuSelectionEntity(AbstractEntity):
     def __init__(self, curr_selection, index):
+        super(MenuSelectionEntity, self).__init__()
         self.prev_selection = None
         self.curr_selection = curr_selection
         self.sel_index = index
 
 
-class SelectableOptionEntity(AbstractEntity):
-    def __init__(self, option_text, available_options, selection):
-        super(SelectableOptionEntity, self).__init__()
+class OptionValueEntity(AbstractEntity):
+    def __init__(self, text, value):
+        super(OptionValueEntity, self).__init__()
+        self.text = text
+        self.value = value
+
+
+class OptionChoiceEntity(AbstractEntity):
+    def __init__(self, text, available_options, selection):
+        super(OptionChoiceEntity, self).__init__()
+        self.text = text
+        self.available_options = available_options
+        self.selection = selection

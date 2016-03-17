@@ -11,7 +11,7 @@ class MainMenuModel(AbstractModel):
         super(MainMenuModel, self).__init__()
         sel_index = 0
         self.options = [SinglePlayerEntity(), MultiplayerEntity(), OptionsEntity(), ExitEntity()]
-        self.selection = MenuOptionSelectionEntity(self.options[sel_index], sel_index)
+        self.selection = MenuSelectionEntity(self.options[sel_index], sel_index)
 
     def next_option(self):
         self.selection.prev_selection = self.selection.curr_selection
