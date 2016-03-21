@@ -95,20 +95,31 @@ class TextContainer(ComponentGroup):
 class MenuContainer(ComponentGroup):
     def __init__(self, components, bg_color, selection_color, selection_model):
         super(MenuContainer, self).__init__()
-        width = 0
         height = 0
-        for component in components:
-            component_size = component.rect.size
-            component_pos = component.rect.topleft
-            if width < component_size[0]:
-                width = component_size[0]
-            component.rect.topleft = (component_pos[0], component_pos[1] + height)
-            height += component_size[1]
-            component.layer = 2
-            self.add(component)
-        sel_comp_rect = components[selection_model.sel_index].rect
-        selection = SelectionComponent(sel_comp_rect.size, selection_color, 1)
-        selection.rect.topleft = sel_comp_rect.topleft
+        width = 0
+        for component_row in components:
+            curr_width = 0
+            curr_height = 0
+            for component in component_row:
+                component_size = component.rect.size
+                component_pos = component.rect.topleft
+                component.rect.topleft = (component_pos[0] + curr_width, component_pos[1] + height)
+                component.layer = 2
+                self.add(component)
+
+                curr_width += component_size[0]
+                if component_size[1] > curr_height:
+                    curr_height = component_size[1]
+            if curr_width > width:
+                width = curr_width
+            height += curr_height
+        topleft = components[selection_model.sel_index][0].rect.topleft
+        size = (0, 0)
+        for component in components[selection_model.sel_index]:
+            curr_size = component.rect.size
+            size = (size[0]+curr_size[0], curr_size[1])
+        selection = SelectionComponent(size, selection_color, 1)
+        selection.rect.topleft = topleft
         selection_model.sprite_hash = selection.__hash__()
         self.add(selection)
         self.selection = selection

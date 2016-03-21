@@ -99,7 +99,7 @@ class MainMenuView(AbstractView):
         for option_model in self.backing_model.options:
             component = TextComponent(option_model.text, 36, Colors.WHITE, Colors.BLACK)
             self.model_sprite_dict[option_model] = component
-            options.append(component)
+            options.append([component])
         menu = MenuContainer(options, Colors.BLACK, Colors.RED, self.backing_model.selection)
         menu.set_midbottom((surface_center[0], surface_size[1] - 36), shift_y=True)
         self.model_sprite_dict[self.backing_model.selection] = menu.selection
@@ -187,7 +187,21 @@ class OptionsView(AbstractView):
     def initialize_surface(self):
         super(OptionsView, self).initialize_surface()
         surface_center = self.surface.get_rect().center
+        surface_size = self.surface.get_rect().size
 
         title = TextContainer("Options View", 48, Colors.WHITE, self.bg_color)
         title.set_midtop((surface_center[0], 0))
         self.containers.extend([title])
+
+        options = []
+        for option_model in self.backing_model.options:
+            text_component = TextComponent(option_model.text, 36, Colors.WHITE, Colors.BLACK)
+            value_component = TextComponent(str(option_model.value), 36, Colors.WHITE, Colors.BLACK)
+            curr_rect = text_component.rect.size
+            value_component.rect.topleft = (curr_rect[0],0)
+            self.model_sprite_dict[option_model] = text_component
+            options.append([text_component, value_component])
+        menu = MenuContainer(options, Colors.BLACK, Colors.RED, self.backing_model.selection)
+        menu.set_midbottom((surface_center[0], surface_size[1] - 36), shift_y=True)
+        self.model_sprite_dict[self.backing_model.selection] = menu.selection
+        self.containers.extend([title, menu])

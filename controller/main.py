@@ -84,7 +84,12 @@ class OptionsController(AbstractController):
         super(OptionsController, self).process_event(event)
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                self.next_controller = self.previous_controller
+                if not self.model.selection.is_active:
+                    self.next_controller = self.previous_controller
+                else:
+                    self.model.set_selection_active()
+            if event.key == pygame.K_RETURN:
+                pass
 
 
 class SinglePlayerController(AbstractController):

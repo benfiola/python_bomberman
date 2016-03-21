@@ -50,4 +50,4 @@ class Configuration(object):
                 self.dict[key].value = value
 
     def get_screen_size(self):
-        return self.dict[ConfigurationData.Keys.SCREEN_SIZE]
+        return self.dict[ConfigurationData.Keys.SCREEN_SIZE].value
