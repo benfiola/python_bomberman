@@ -31,8 +31,8 @@ class GameState(ViewState):
         host_config = get_default_host_config()
         self.client.push_custom_event(custom_events.CreateHost(host_config))
         self.client.push_custom_event(custom_events.ConnectToHost(host_config))
-        self.client.push_custom_event(custom_events.SendMessage(messages.InitializeGame(get_default_game_configuration())))
-        self.client.push_custom_event(custom_events.SendMessage(messages.StartGame()))
+        self.client.push_custom_event(custom_events.SendMessage(messages.InitializeGameMessage(get_default_game_configuration())))
+        self.client.push_custom_event(custom_events.SendMessage(messages.StartGameMessage()))
 
     def handle_custom_event(self, event):
         pass

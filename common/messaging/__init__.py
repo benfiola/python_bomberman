@@ -9,21 +9,21 @@ class MessageBus(object):
         self.logger = get_logger(self)
         self.source = source
         self.response_callback = response_callback
-        self.socket = None
+        self.sockets = {}
         self.server = socketserver.TCPServer(self.source, self.generate_handler())
         self.server_thread = threading.Thread(name=self.get_thread_name(), target=self.server.serve_forever)
         self.server_thread.start()
 
-    def close_socket(self):
-        if self.socket is not None:
-            self.logger.debug("Closing message bus socket")
-            self.socket.shutdown(socket.SHUT_RDWR)
-            self.socket.close()
-            self.socket = None
+    def close_socket(self, client):
+        if client in self.sockets:
+            self.logger.debug("Closing message bus socket to %s" % str(client))
+            self.sockets[client].shutdown(socket.SHUT_RDWR)
+            self.sockets[client].close()
+            self.sockets.pop(client, None)
 
     def shut_down(self):
         self.logger.debug("Shutting down message bus")
-        self.close_socket()
+        self.shutting_down = True
         self.server.shutdown()
 
     def get_thread_name(self):
@@ -33,23 +33,24 @@ class MessageBus(object):
         return "%s-MessageBus-SocketServer" % str(calling_obj)
 
     def connect(self, target):
-        if self.socket is None:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect(target)
+        if target not in self.sockets:
+            self.sockets[target] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sockets[target].connect(target)
 
     def send_message(self, data):
         self.logger.debug("Sending message %s" % (str(data)))
-        # send data
-        self.socket.sendall(pickle.dumps(data))
-        # receive response
-        r_data = self.socket.recv(1024).strip()
-        response = pickle.loads(r_data)
-        self.logger.debug("Receiving response %s" % (str(response)))
-        if isinstance(response, FailedResponse):
-            if isinstance(response.data, Exception):
-                raise response.data
-            if isinstance(response.data, str):
-                raise Exception(response.data)
+        for client_socket in self.sockets.values():
+            # send data
+            client_socket.sendall(pickle.dumps(data))
+            # receive response
+            r_data = client_socket.recv(1024).strip()
+            response = pickle.loads(r_data)
+            self.logger.debug("Receiving response %s" % (str(response)))
+            if isinstance(response, FailedResponseMessage):
+                if isinstance(response.data.error, Exception):
+                    raise response.data.error
+                if isinstance(response.data.error, str):
+                    raise Exception(response.data.error)
 
     def receive_message(self, message):
         data = pickle.loads(message)
@@ -67,15 +68,15 @@ class MessageBus(object):
             def handle(self):
                 while not bus.shutting_down:
                     try:
-                        data = self.request.recv(1024).strip()
+                        data = self.request.recv(32768).strip()
                         if not data:
                             break
                         bus.receive_message(data)
                         self.logger.debug("Sending SuccessfulResponse")
-                        self.request.sendall(pickle.dumps(SuccessfulResponse()))
+                        self.request.sendall(pickle.dumps(SuccessfulResponseMessage()))
                     except Exception as e:
                         self.logger.debug("Sending FailedResponse")
-                        self.request.sendall(pickle.dumps(FailedResponse(e)))
+                        self.request.sendall(pickle.dumps(FailedResponseMessage(e)))
                 self.logger.debug("RequestHandler stopped")
 
         return RequestHandler

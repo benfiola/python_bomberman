@@ -1,28 +1,12 @@
+from .spawns import *
+
+
 class Map(object):
     def __init__(self, dimensions, spawns):
         self.dimensions = dimensions
-        self.spawns = spawns
-
-
-class EntitySpawn(object):
-    def __init__(self, mapping, position):
-        self.character_mapping = mapping
-        self.position = position
-
-
-class PlayerSpawn(EntitySpawn):
-    def __init__(self, position=None):
-        super().__init__('P', position)
-
-
-class IndestructibleWallSpawn(EntitySpawn):
-    def __init__(self, position=None):
-        super().__init__('W', position)
-
-
-class DestructibleWallSpawn(EntitySpawn):
-    def __init__(self, position=None):
-        super().__init__('D', position)
+        self.spawns = [[None for y in range(self.dimensions[1])] for x in range(self.dimensions[0])]
+        for spawn in spawns:
+            self.spawns[spawn.position[0]][spawn.position[1]] = spawn
 
 
 class MapLoader(object):
@@ -57,6 +41,7 @@ class MapLoader(object):
                     raise Exception("Load error - character %s unrecognized." % (character))
                 spawn_class = self.spawn_map[character]
                 if spawn_class:
+                    spawn = spawn_class((x, y))
                     spawns.append(spawn_class((x, y)))
         new_map = Map((width, height), spawns)
         return new_map

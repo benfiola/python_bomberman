@@ -1,5 +1,5 @@
 from . import sdl2_path
-import uuid, sys, sdl2, sdl2.ext
+import uuid, sys, sdl2, sdl2.ext, threading
 from common import get_logger
 from common.messaging.messages import *
 from common.messaging import MessageBus
@@ -18,31 +18,31 @@ class Client(object):
         self.state = None
         self.bus = None
         self.host = None
-        self.run()
+        self.host_thread = None
 
     def create_host(self, host_configuration):
-        self.logger.debug("Host created")
-        self.host = Host(host_configuration)
+        self.logger.debug("Creating Host")
+        self.host = Host(self.id, host_configuration)
+        self.host_thread = threading.Thread(name="Host-Thread", target=self.host.run)
+        self.host_thread.start()
 
     def connect_to_host(self, host_configuration):
         if self.bus is None:
             self.bus = MessageBus(self.configuration.socket_data, self.receive_message)
             self.bus.connect(host_configuration.socket_data)
-            self.bus.send_message(ConnectionRequest(self.configuration.socket_data))
+            self.send_message(ConnectionRequest(self.configuration.socket_data))
 
     def receive_message(self, message):
-        self.push_custom_event(ReceiveMessage(message))
+        self.logger.info("Received message : %s" % str(message))
 
     def send_message(self, message):
+        message.data.client_id = self.id
         self.bus.send_message(message)
 
     def disconnect_from_host(self):
         if self.bus is not None:
-            self.bus.close_socket()
-        if self.host is not None:
-            self.host.shut_down()
-            self.host = None
-        if self.bus is not None:
+            self.send_message(DisconnectionRequest(self.configuration.socket_data))
+            self.send_message(HostShutdownMessage())
             self.bus.shut_down()
             self.bus = None
 
@@ -69,6 +69,7 @@ class Client(object):
         self.state = next_state_class(self)
 
     def run(self):
+        self.logger.info("Client started")
         sdl2.ext.init()
         window = sdl2.ext.Window(self.configuration.game_name, size=self.configuration.screen_size)
         window.show()
@@ -90,6 +91,7 @@ class Client(object):
                         self.disconnect_from_host()
                     elif isinstance(event, QuitEvent):
                         self.shutting_down = True
+                        break
                     elif isinstance(event, ViewStateChange):
                         self.change_view_state(event.next_state)
                 elif event.type == sdl2.SDL_QUIT:

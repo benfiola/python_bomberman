@@ -1,3 +1,5 @@
+from ..maps import MapLoader
+
 
 class ClientConfiguration(object):
     def __init__(self):
@@ -5,9 +7,12 @@ class ClientConfiguration(object):
         self.game_name = "Bomberman"
         self.socket_data = ('localhost', 20000)
 
+
 class GameConfiguration(object):
     def __init__(self):
         self.map_name = "map.txt"
+        self.map = MapLoader(self.map_name).load()
+
 
 class HostConfiguration(object):
     def __init__(self):
@@ -16,6 +21,7 @@ class HostConfiguration(object):
 client_configuration = ClientConfiguration()
 game_configuration = GameConfiguration()
 host_configuration = HostConfiguration()
+
 
 def get_default_game_configuration():
     return game_configuration

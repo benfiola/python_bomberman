@@ -1,8 +1,4 @@
-
-
-class CustomEvent(object):
-    def __init__(self):
-        pass
+from common.custom_events import *
 
 
 class ViewStateChange(CustomEvent):
@@ -28,18 +24,7 @@ class DisconnectFromHost(CustomEvent):
         super().__init__()
 
 
-class SendMessage(CustomEvent):
-    def __init__(self, message):
-        super().__init__()
-        self.message = message
-
-
-class ReceiveMessage(CustomEvent):
-    def __init__(self, message):
-        super().__init__()
-        self.message = message
-
-
 class QuitEvent(CustomEvent):
     def __init__(self):
         super().__init__()
+
