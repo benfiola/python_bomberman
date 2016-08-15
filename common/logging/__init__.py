@@ -13,7 +13,10 @@ logger.setLevel(logging.DEBUG)
 
 
 def get_logger(obj, level=None):
-    new_logger = logging.getLogger(obj.__module__ + "." + obj.__class__.__name__)
+    if obj is not None:
+        new_logger = logging.getLogger(obj.__module__ + "." + obj.__class__.__name__)
+    else:
+        new_logger = logging.getLogger()
     if level is not None:
         new_logger.setLevel(level)
     return new_logger

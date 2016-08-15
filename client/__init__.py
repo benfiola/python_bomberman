@@ -4,6 +4,7 @@ from common import get_logger
 from common.messaging.messages import *
 from common.messaging import MessageBus
 from host import Host
+from .graphics import *
 from .view_states import *
 from .custom_events import *
 
@@ -15,6 +16,7 @@ class Client(object):
         self.shutting_down = False
         self.configuration = configuration
         self.custom_events = []
+        self.window = None
         self.state = None
         self.bus = None
         self.host = None
@@ -67,13 +69,14 @@ class Client(object):
         self.logger.info("Changing state to %s" % str(next_state_class.__name__))
         self.state.clean_up()
         self.state = next_state_class(self)
+        self.window.change_renderer(self.state)
 
     def run(self):
         self.logger.info("Client started")
-        sdl2.ext.init()
-        window = sdl2.ext.Window(self.configuration.game_name, size=self.configuration.screen_size)
-        window.show()
         self.state = MenuState(self)
+        sdl2.ext.init()
+        self.window = GameWindow(self.state)
+        self.window.show()
         while not self.shutting_down:
             events = sdl2.ext.get_events()
             other_events = self.get_custom_events()
@@ -98,7 +101,7 @@ class Client(object):
                     self.shutting_down = True
                     break
                 self.state.process_event(event)
-            window.refresh()
+            self.window.refresh()
         self.shut_down()
         return 0
 

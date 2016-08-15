@@ -20,6 +20,7 @@ class Host(object):
         self.bus.close_socket()
 
     def shut_down(self):
+        self.logger.info("Host shutting down")
         self.bus.shut_down()
 
     def push_custom_event(self, event):

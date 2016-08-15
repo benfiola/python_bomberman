@@ -17,14 +17,21 @@ class MessageBus(object):
     def close_socket(self, client):
         if client in self.sockets:
             self.logger.debug("Closing message bus socket to %s" % str(client))
-            self.sockets[client].shutdown(socket.SHUT_RDWR)
-            self.sockets[client].close()
+            try:
+                self.sockets[client].shutdown(socket.SHUT_RDWR)
+                self.sockets[client].close()
+            except OSError as e:
+                self.logger.error("OSError when closing socket - continuing")
             self.sockets.pop(client, None)
 
     def shut_down(self):
         self.logger.debug("Shutting down message bus")
+        clients = list(self.sockets.keys())
+        for client in clients:
+            self.close_socket(client)
         self.shutting_down = True
         self.server.shutdown()
+        self.server_thread.join()
 
     def get_thread_name(self):
         import inspect
