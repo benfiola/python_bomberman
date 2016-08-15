@@ -1,3 +1,4 @@
+import uuid
 from common.logging import get_logger
 from common.messaging import MessageBus
 from common.messaging.messages import *
@@ -8,6 +9,7 @@ from .game import *
 
 class Host(object):
     def __init__(self, owner, configuration):
+        self.id = uuid.uuid4()
         self.owner = owner
         self.logger = get_logger(self)
         self.configuration = configuration
@@ -39,17 +41,19 @@ class Host(object):
             self.push_custom_event(ClientConnectionEvent(message.data.client_id, message.data.socket_data))
         if isinstance(message, DisconnectionRequest):
             self.push_custom_event(ClientDisconnectionEvent(message.data.client_id, message.data.socket_data))
-        if isinstance(message, HostShutdownMessage):
+        if isinstance(message, HostShutdownRequest):
             self.push_custom_event(QuitEvent(message.data.client_id))
-        if isinstance(message, InitializeGameMessage):
+        if isinstance(message, InitializeGameRequest):
             self.push_custom_event(InitializeGameEvent(message.data.client_id, message.data.configuration))
-        if isinstance(message, StartGameMessage):
+        if isinstance(message, StartGameRequest):
             self.push_custom_event(StartGameEvent(message.data.client_id))
-        if isinstance(message, PrintMessage):
+        if isinstance(message, AssignPlayerEntityRequest):
+            self.push_custom_event(AssignPlayerEvent(message.data.client_id))
+        if isinstance(message, PrintMessageRequest):
             print("Host received message from client : %s" % message.data.message)
 
     def create_game(self, game_configuration):
-        self.game = Game(game_configuration)
+        self.game = Game(self, game_configuration)
 
     def send_message(self, data):
         self.bus.send_message(data)
@@ -73,10 +77,14 @@ class Host(object):
                 if isinstance(event, ClientValidatedEvent):
                     allow_event_dispatch = self.validate_id(event)
                 if allow_event_dispatch:
+                    if isinstance(event, SendMessage):
+                        self.send_message(event.message)
                     if isinstance(event, InitializeGameEvent):
                         self.create_game(event.game_configuration)
-                    if isinstance(event, StartGameEvent):
+                    if isinstance(event, AssignPlayerEvent):
                         self.game.assign_player_to_client(event.client_id)
+                    if isinstance(event, StartGameEvent):
+                        self.game.start_game()
                     if isinstance(event, ClientConnectionEvent):
                         self.connect_to_client(event.socket_data)
                     if isinstance(event, ClientDisconnectionEvent):

@@ -5,6 +5,7 @@ class Entity(object):
     def __init__(self, position):
         self.id = uuid.uuid4()
         self.position = position
+        self.sprite = None
 
 
 class PlayerEntity(Entity):

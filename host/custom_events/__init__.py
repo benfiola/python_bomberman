@@ -1,6 +1,5 @@
 from common.custom_events import *
 
-
 class ClientEvent(CustomEvent):
     def __init__(self, client_id):
         super().__init__()
@@ -20,7 +19,7 @@ class ClientConnectionEvent(ClientEvent):
 
 class ClientDisconnectionEvent(ClientEvent):
     def __init__(self, client_id, socket_data):
-        super().__init__(ClientEvent)
+        super().__init__(client_id)
         self.socket_data = socket_data
 
 
@@ -30,7 +29,12 @@ class InitializeGameEvent(ClientValidatedEvent):
         self.game_configuration = game_configuration
 
 
-class StartGameEvent(ClientEvent):
+class AssignPlayerEvent(ClientEvent):
+    def __init__(self, client_id):
+        super().__init__(client_id)
+
+
+class StartGameEvent(ClientValidatedEvent):
     def __init__(self, client_id):
         super().__init__(client_id)
 

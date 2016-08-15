@@ -53,7 +53,7 @@ class MessageBus(object):
             r_data = client_socket.recv(1024).strip()
             response = pickle.loads(r_data)
             self.logger.debug("Receiving response %s" % (str(response)))
-            if isinstance(response, FailedResponseMessage):
+            if isinstance(response, FailedResponse):
                 if isinstance(response.data.error, Exception):
                     raise response.data.error
                 if isinstance(response.data.error, str):
@@ -80,10 +80,10 @@ class MessageBus(object):
                             break
                         bus.receive_message(data)
                         self.logger.debug("Sending SuccessfulResponse")
-                        self.request.sendall(pickle.dumps(SuccessfulResponseMessage()))
+                        self.request.sendall(pickle.dumps(SuccessfulResponse()))
                     except Exception as e:
                         self.logger.debug("Sending FailedResponse")
-                        self.request.sendall(pickle.dumps(FailedResponseMessage(e)))
+                        self.request.sendall(pickle.dumps(FailedResponse(e)))
                 self.logger.debug("RequestHandler stopped")
 
         return RequestHandler

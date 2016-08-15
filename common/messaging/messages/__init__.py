@@ -22,37 +22,54 @@ class DisconnectionRequest(BaseMessage):
         self.data.socket_data = socket_data
 
 
-class HostShutdownMessage(BaseMessage):
+class HostShutdownRequest(BaseMessage):
     def __init__(self):
         super().__init__()
 
 
-class PrintMessage(BaseMessage):
+class PrintMessageRequest(BaseMessage):
     def __init__(self, message):
         super().__init__()
         self.data.message = message
 
 
-class SuccessfulResponseMessage(BaseMessage):
+class SuccessfulResponse(BaseMessage):
     def __init__(self):
         super().__init__()
 
 
-class FailedResponseMessage(BaseMessage):
+class FailedResponse(BaseMessage):
     def __init__(self, error):
         super().__init__()
         self.data.error = error
 
 
-class InitializeGameMessage(BaseMessage):
+class InitializeGameRequest(BaseMessage):
     def __init__(self, configuration):
         super().__init__()
         self.data.configuration = configuration
 
 
-class StartGameMessage(BaseMessage):
+class AssignPlayerEntityRequest(BaseMessage):
     def __init__(self):
         super().__init__()
+
+
+class StartGameRequest(BaseMessage):
+    def __init__(self):
+        super().__init__()
+
+
+class ClientGameDataRequest(BaseMessage):
+    def __init__(self, game_board):
+        super().__init__()
+        self.data.game_board = game_board
+
+
+class MoveEntityRequest(BaseMessage):
+    def __init__(self, direction):
+        super().__init__()
+        self.data.direction = direction
 
 
 class MessageData(object):

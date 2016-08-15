@@ -1,6 +1,12 @@
 from common.custom_events import *
 
 
+class InitializeGameData(CustomEvent):
+    def __init__(self, game_board):
+        super().__init__()
+        self.game_board = game_board
+
+
 class ViewStateChange(CustomEvent):
     def __init__(self, next_state):
         super().__init__()

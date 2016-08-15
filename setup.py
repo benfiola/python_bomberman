@@ -7,6 +7,6 @@ setup(
     version=version,
     packages=find_packages(),
     install_requires=[
-          'PySDL2'
+        'PySDL2',
     ]
 )
