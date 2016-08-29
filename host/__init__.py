@@ -18,9 +18,6 @@ class Host(object):
         self.custom_events = []
         self.bus = MessageBus(self.configuration.socket_data, self.receive_message)
 
-    def close_client_socket(self):
-        self.bus.close_socket()
-
     def shut_down(self):
         self.logger.info("Host shutting down")
         self.bus.shut_down()
@@ -95,6 +92,7 @@ class Host(object):
                 else:
                     self.logger.debug("Host disallowed event %s because client_id %s does not match %s" % (str(event), str(event.client_id), str(self.owner)))
         self.shut_down()
+        self.logger.info("Host shut down")
 
 
 def get_default_host_config():

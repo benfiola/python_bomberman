@@ -49,6 +49,8 @@ class Client(object):
             self.send_message(HostShutdownRequest())
             self.bus.shut_down()
             self.bus = None
+            self.host = None
+            self.host_thread.join()
 
     def shut_down(self):
         if self.state is not None:

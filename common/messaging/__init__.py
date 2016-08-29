@@ -10,6 +10,7 @@ class MessageBus(object):
         self.source = source
         self.response_callback = response_callback
         self.sockets = {}
+        socketserver.TCPServer.allow_reuse_address = True
         self.server = socketserver.TCPServer(self.source, self.generate_handler())
         self.server_thread = threading.Thread(name=self.get_thread_name(), target=self.server.serve_forever)
         self.server_thread.start()
@@ -41,8 +42,10 @@ class MessageBus(object):
 
     def connect(self, target):
         if target not in self.sockets:
-            self.sockets[target] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sockets[target].connect(target)
+            new_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            new_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            new_socket.connect(target)
+            self.sockets[target] = new_socket
 
     def send_message(self, data):
         self.logger.debug("Sending message %s" % (str(data)))
