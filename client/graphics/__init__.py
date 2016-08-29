@@ -3,6 +3,7 @@ import sdl2.ext
 from client.view_states import *
 from common.configuration import client_configuration
 from common.entities import *
+from client.platform import get_font_path
 
 class GameWindow(sdl2.ext.Window):
     def __init__(self, state):
@@ -26,7 +27,7 @@ class StateBasedRendererSystem(sdl2.ext.SoftwareSpriteRenderSystem):
         super().__init__(window=window)
         self.state = state
         self.factory = sdl2.ext.SpriteFactory(sprite_type=sdl2.ext.SOFTWARE)
-        self.fontmanager = sdl2.ext.FontManager(font_path="/Library/Fonts/Arial.ttf", size=16, color=(255, 255, 255))
+        self.fontmanager = sdl2.ext.FontManager(font_path=get_font_path("Arial"), size=16, color=(255, 255, 255))
 
 
 class MenuRendererSystem(StateBasedRendererSystem):
