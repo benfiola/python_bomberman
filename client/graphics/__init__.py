@@ -46,7 +46,6 @@ class GameRendererSystem(StateBasedRendererSystem):
 
 
     def render(self, sprites=[], x=None, y=None):
-        sdl2.ext.fill(self.surface, sdl2.ext.Color(0, 0, 0))
         sprites = []
         if self.state.game_board is not None:
             game_board_size =  (len(self.state.game_board), len(self.state.game_board[0]))
@@ -64,6 +63,7 @@ class GameRendererSystem(StateBasedRendererSystem):
             text = self.factory.from_text(text="Press enter to start", fontmanager=self.fontmanager)
             text.position = (0, int(client_configuration.screen_size[1]/2))
             sprites.append(text)
+        sdl2.ext.fill(self.surface, sdl2.ext.Color(0, 0, 0))
         super().render(sprites)
 
     def transform_sprite(self, entity):

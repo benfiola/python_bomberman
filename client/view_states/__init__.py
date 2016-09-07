@@ -31,10 +31,15 @@ class GameState(ViewState):
     def __init__(self, client):
         super().__init__(client)
         self.game_board = None
+        self.needs_redraw = True
 
     def handle_custom_event(self, event):
         if isinstance(event, custom_events.InitializeGameData):
             self.game_board = event.game_board
+        if isinstance(event, custom_events.UpdateGameData):
+            for coord in event.updated_coordinates:
+                value = event.updated_coordinates[coord]
+                self.game_board[coord[0]][coord[1]] = value
 
     def handle_sdl2_event(self, event):
         if event.type == sdl2.SDL_KEYDOWN:
@@ -55,9 +60,9 @@ class GameState(ViewState):
             elif event.key.keysym.sym == sdl2.SDLK_r:
                 self.client.push_custom_event(custom_events.SendMessage(messages.StartGameRequest()))
             elif event.key.keysym.sym == sdl2.SDLK_UP:
-                self.client.push_custom_event(custom_events.SendMessage(messages.MoveEntityRequest((0, 1))))
-            elif event.key.keysym.sym == sdl2.SDLK_DOWN:
                 self.client.push_custom_event(custom_events.SendMessage(messages.MoveEntityRequest((0, -1))))
+            elif event.key.keysym.sym == sdl2.SDLK_DOWN:
+                self.client.push_custom_event(custom_events.SendMessage(messages.MoveEntityRequest((0, 1))))
             elif event.key.keysym.sym == sdl2.SDLK_LEFT:
                 self.client.push_custom_event(custom_events.SendMessage(messages.MoveEntityRequest((-1, 0))))
             elif event.key.keysym.sym == sdl2.SDLK_RIGHT:

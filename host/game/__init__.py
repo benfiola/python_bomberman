@@ -45,7 +45,10 @@ class Game(object):
             self.board[pos[0]][pos[1]] = None
             self.board[new_pos[0]][new_pos[1]] = entity
             self.logger.info("New position: %s" % str(new_pos))
-            self.host.push_custom_event(SendMessage(messages.ClientGameDataRequest(self.board)))
+            update_data = dict()
+            update_data[pos] = self.board[pos[0]][pos[1]]
+            update_data[new_pos] = self.board[new_pos[0]][new_pos[1]]
+            self.host.push_custom_event(SendMessage(messages.ClientGameDataUpdate(update_data)))
 
     def start_game(self):
         self.game_started = True

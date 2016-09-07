@@ -38,6 +38,8 @@ class Client(object):
         self.logger.info("Received message : %s" % str(message))
         if isinstance(message, ClientGameDataRequest):
             self.push_custom_event(InitializeGameData(message.data.game_board))
+        if isinstance(message, ClientGameDataUpdate):
+            self.push_custom_event(UpdateGameData(message.data.updated_coordinates))
 
     def send_message(self, message):
         message.data.client_id = self.id

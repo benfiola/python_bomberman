@@ -65,6 +65,11 @@ class ClientGameDataRequest(BaseMessage):
         super().__init__()
         self.data.game_board = game_board
 
+class ClientGameDataUpdate(BaseMessage):
+    def __init__(self, coord_map):
+        super().__init__()
+        self.data.updated_coordinates = coord_map
+
 
 class MoveEntityRequest(BaseMessage):
     def __init__(self, direction):

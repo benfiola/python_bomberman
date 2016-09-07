@@ -33,7 +33,10 @@ class HostMessageBus(MessageBus):
 
     def send_message(self, data):
         for client_socket in self.sockets.values():
-            self._send_message(client_socket, data)
+            def _send_data():
+                self._send_message(client_socket, data)
+            t = threading.Thread(target=_send_data)
+            t.start()
 
     def generate_handler(self):
         bus = self

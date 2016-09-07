@@ -7,6 +7,12 @@ class InitializeGameData(CustomEvent):
         self.game_board = game_board
 
 
+class UpdateGameData(CustomEvent):
+    def __init__(self, updated_coordinates):
+        super().__init__()
+        self.updated_coordinates = updated_coordinates
+
+
 class ViewStateChange(CustomEvent):
     def __init__(self, next_state):
         super().__init__()
