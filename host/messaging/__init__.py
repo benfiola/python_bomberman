@@ -27,7 +27,8 @@ class HostMessageBus(MessageBus):
         self.server.shutdown()
         self.server_thread.join()
 
-    def register_socket(self, s):
+    def handle_new_socket(self, s):
+        super().handle_new_socket(s)
         self.logger.info("Registering socket %s" % str(s.getpeername()))
         self.sockets[s.getpeername()] = s
 
@@ -48,7 +49,7 @@ class HostMessageBus(MessageBus):
 
             def handle(self):
                 socket_name = self.request.getpeername()
-                bus.register_socket(self.request)
+                bus.handle_new_socket(self.request)
                 while not bus.shutting_down:
                     processed_message = bus.handle_message(self.request)
                     if processed_message is None:

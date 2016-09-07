@@ -20,9 +20,7 @@ class ClientMessageBus(MessageBus):
         if self.socket is not None:
             self._close_socket(self.socket)
             self.socket = None
-        new_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        new_socket.connect(target)
-        self.socket = new_socket
+        self.socket = self._create_socket(target)
         self.receive_thread = threading.Thread(name="Client-SocketReceive", target=self.receive_messages)
         self.receive_thread.start()
 
