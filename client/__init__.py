@@ -44,8 +44,9 @@ class Client(object):
         self.bus.send_message(message)
 
     def disconnect_from_host(self):
-        self.send_message(ClientDisconnectionRequest(self.bus.socket.getsockname()))
         if self.bus is not None:
+            if self.bus.socket is not None:
+                self.send_message(ClientDisconnectionRequest(self.bus.socket.getsockname()))
             self.bus.shut_down()
             if self.host is not None:
                 self.host = None

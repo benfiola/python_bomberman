@@ -8,6 +8,7 @@ class HostMessageBus(MessageBus):
         super().__init__(response_callback)
         self.sockets = {}
         self.address = address
+        socketserver.ThreadingTCPServer.allow_reuse_address = True
         self.server = socketserver.ThreadingTCPServer(self.address, self.generate_handler())
         self.server_thread = threading.Thread(name="Host-MessageBus-SocketServer", target=self.server.serve_forever)
         self.server_thread.start()
@@ -43,12 +44,13 @@ class HostMessageBus(MessageBus):
                 super().__init__(*args, **kwargs)
 
             def handle(self):
+                socket_name = self.request.getpeername()
                 bus.register_socket(self.request)
                 while not bus.shutting_down:
                     processed_message = bus.handle_message(self.request)
                     if processed_message is None:
                         break
-                bus.close_socket(self.request.getpeername())
+                bus.close_socket(socket_name)
                 self.logger.debug("RequestHandler stopped")
 
         return RequestHandler
