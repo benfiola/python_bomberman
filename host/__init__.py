@@ -48,6 +48,8 @@ class Host(object):
             self.push_custom_event(StartGameEvent(message.data.client_id))
         if isinstance(message, AssignPlayerEntityRequest):
             self.push_custom_event(AssignPlayerEvent(message.data.client_id))
+        if isinstance(message, MoveEntityRequest):
+            self.push_custom_event(MoveEntityEvent(message.data.client_id, message.data.direction))
         if isinstance(message, PrintMessageRequest):
             print("Host received message from client : %s" % message.data.message)
 
@@ -81,6 +83,8 @@ class Host(object):
                         self.create_game(event.game_configuration)
                     if isinstance(event, AssignPlayerEvent):
                         self.game.assign_player_to_client(event.client_id)
+                    if isinstance(event, MoveEntityEvent):
+                        self.game.move_entity(event.client_id, event.direction)
                     if isinstance(event, StartGameEvent):
                         self.game.start_game()
                     if isinstance(event, ClientDisconnectionEvent):

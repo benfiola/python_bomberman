@@ -29,6 +29,12 @@ class InitializeGameEvent(ClientValidatedEvent):
         self.game_configuration = game_configuration
 
 
+class MoveEntityEvent(ClientEvent):
+    def __init__(self, client_id, direction):
+        super().__init__(client_id)
+        self.direction = direction
+
+
 class AssignPlayerEvent(ClientEvent):
     def __init__(self, client_id):
         super().__init__(client_id)

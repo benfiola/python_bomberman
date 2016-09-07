@@ -30,11 +30,7 @@ class ViewState(object):
 class GameState(ViewState):
     def __init__(self, client):
         super().__init__(client)
-        host_config = get_default_host_config()
-        self.game_started = False
         self.game_board = None
-        self.client.push_custom_event(custom_events.CreateHost(host_config))
-        self.client.push_custom_event(custom_events.ConnectToHost(host_config))
 
     def handle_custom_event(self, event):
         if isinstance(event, custom_events.InitializeGameData):
@@ -45,12 +41,27 @@ class GameState(ViewState):
             if event.key.keysym.sym == sdl2.SDLK_ESCAPE:
                 self.client.push_custom_event(custom_events.DisconnectFromHost())
                 self.client.push_custom_event(custom_events.ViewStateChange(MenuState))
-            elif event.key.keysym.sym == sdl2.SDLK_RETURN:
+            if event.key.keysym.sym == sdl2.SDLK_q:
+                host_config = get_default_host_config()
+                self.client.push_custom_event(custom_events.CreateHost(host_config))
+                self.client.push_custom_event(custom_events.ConnectToHost(host_config))
                 self.client.push_custom_event(
                     custom_events.SendMessage(messages.InitializeGameRequest(get_default_game_configuration())))
+            elif event.key.keysym.sym == sdl2.SDLK_w:
+                host_config = get_default_host_config()
+                self.client.push_custom_event(custom_events.ConnectToHost(host_config))
+            elif event.key.keysym.sym == sdl2.SDLK_e:
                 self.client.push_custom_event(custom_events.SendMessage(messages.AssignPlayerEntityRequest()))
+            elif event.key.keysym.sym == sdl2.SDLK_r:
                 self.client.push_custom_event(custom_events.SendMessage(messages.StartGameRequest()))
-                self.game_started = True
+            elif event.key.keysym.sym == sdl2.SDLK_UP:
+                self.client.push_custom_event(custom_events.SendMessage(messages.MoveEntityRequest((0, 1))))
+            elif event.key.keysym.sym == sdl2.SDLK_DOWN:
+                self.client.push_custom_event(custom_events.SendMessage(messages.MoveEntityRequest((0, -1))))
+            elif event.key.keysym.sym == sdl2.SDLK_LEFT:
+                self.client.push_custom_event(custom_events.SendMessage(messages.MoveEntityRequest((-1, 0))))
+            elif event.key.keysym.sym == sdl2.SDLK_RIGHT:
+                self.client.push_custom_event(custom_events.SendMessage(messages.MoveEntityRequest((1, 0))))
 
 
 class MenuState(ViewState):
