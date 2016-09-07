@@ -1,6 +1,6 @@
 import uuid
 from common.logging import get_logger
-from common.messaging import MessageBus
+from .messaging import HostMessageBus
 from common.messaging.messages import *
 from common.configuration import host_configuration
 from .custom_events import *
@@ -16,11 +16,13 @@ class Host(object):
         self.game = None
         self.shutting_down = False
         self.custom_events = []
-        self.bus = MessageBus(self.configuration.socket_data, self.receive_message)
+        self.bus = HostMessageBus(self.configuration.socket_data, self.receive_message)
 
     def shut_down(self):
-        self.logger.info("Host shutting down")
-        self.bus.shut_down()
+        if not self.shutting_down:
+            self.logger.info("Host shutting down")
+            self.bus.shut_down()
+            self.shutting_down = True
 
     def push_custom_event(self, event):
         self.custom_events.append(event)
@@ -34,9 +36,9 @@ class Host(object):
         return self.owner == event.client_id
 
     def receive_message(self, message):
-        if isinstance(message, ConnectionRequest):
+        if isinstance(message, ClientConnectionRequest):
             self.push_custom_event(ClientConnectionEvent(message.data.client_id, message.data.socket_data))
-        if isinstance(message, DisconnectionRequest):
+        if isinstance(message, ClientDisconnectionRequest):
             self.push_custom_event(ClientDisconnectionEvent(message.data.client_id, message.data.socket_data))
         if isinstance(message, HostShutdownRequest):
             self.push_custom_event(QuitEvent(message.data.client_id))
@@ -55,11 +57,10 @@ class Host(object):
     def send_message(self, data):
         self.bus.send_message(data)
 
-    def connect_to_client(self, client):
-        self.bus.connect(client)
-
-    def disconnect_from_client(self, client):
+    def disconnect_from_client(self, client_id, client):
         self.bus.close_socket(client)
+        if self.owner == client_id:
+            self.shut_down()
 
     def log_event(self, event):
         self.logger.debug("Received event %s" % str(event))
@@ -82,13 +83,8 @@ class Host(object):
                         self.game.assign_player_to_client(event.client_id)
                     if isinstance(event, StartGameEvent):
                         self.game.start_game()
-                    if isinstance(event, ClientConnectionEvent):
-                        self.connect_to_client(event.socket_data)
                     if isinstance(event, ClientDisconnectionEvent):
-                        self.disconnect_from_client(event.socket_data)
-                    if isinstance(event, QuitEvent):
-                        self.shutting_down = True
-                        break
+                        self.disconnect_from_client(event.client_id, event.socket_data)
                 else:
                     self.logger.debug("Host disallowed event %s because client_id %s does not match %s" % (str(event), str(event.client_id), str(self.owner)))
         self.shut_down()

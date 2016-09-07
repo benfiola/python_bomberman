@@ -10,13 +10,13 @@ class BaseMessage(object):
         return "%s:[%s]" % (self.__class__.__name__, str(self.data))
 
 
-class ConnectionRequest(BaseMessage):
+class ClientConnectionRequest(BaseMessage):
     def __init__(self, socket_data):
         super().__init__()
         self.data.socket_data = socket_data
 
 
-class DisconnectionRequest(BaseMessage):
+class ClientDisconnectionRequest(BaseMessage):
     def __init__(self, socket_data):
         super().__init__()
         self.data.socket_data = socket_data

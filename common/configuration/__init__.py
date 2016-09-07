@@ -5,7 +5,6 @@ class ClientConfiguration(object):
     def __init__(self):
         self.screen_size = (800, 600)
         self.game_name = "Bomberman"
-        self.socket_data = ('localhost', 20000)
 
 
 class GameConfiguration(object):
@@ -15,8 +14,8 @@ class GameConfiguration(object):
 
 
 class HostConfiguration(object):
-    def __init__(self):
-        self.socket_data = ('localhost', 20001)
+    def __init__(self, socket_data=('localhost', 20001)):
+        self.socket_data = socket_data
 
 client_configuration = ClientConfiguration()
 game_configuration = GameConfiguration()

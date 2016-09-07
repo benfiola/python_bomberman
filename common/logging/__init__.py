@@ -12,7 +12,7 @@ logger.addHandler(console_handler)
 logger.setLevel(logging.DEBUG)
 
 
-def get_logger(obj, level=None):
+def get_logger(obj=None, level=None):
     if obj is not None:
         new_logger = logging.getLogger(obj.__module__ + "." + obj.__class__.__name__)
     else:

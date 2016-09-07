@@ -2,7 +2,7 @@ from . import platform
 import uuid, sys, sdl2, sdl2.ext, threading
 from common import get_logger
 from common.messaging.messages import *
-from common.messaging import MessageBus
+from .messaging import ClientMessageBus
 from host import Host
 from .graphics import *
 from .view_states import *
@@ -25,14 +25,14 @@ class Client(object):
     def create_host(self, host_configuration):
         self.logger.debug("Creating Host")
         self.host = Host(self.id, host_configuration)
-        self.host_thread = threading.Thread(name="Host-Thread", target=self.host.run)
+        self.host_thread = threading.Thread(name="Host", target=self.host.run)
         self.host_thread.start()
 
     def connect_to_host(self, host_configuration):
         if self.bus is None:
-            self.bus = MessageBus(self.configuration.socket_data, self.receive_message)
+            self.bus = ClientMessageBus(self.receive_message)
             self.bus.connect(host_configuration.socket_data)
-            self.send_message(ConnectionRequest(self.configuration.socket_data))
+            self.send_message(ClientConnectionRequest(self.bus.socket.getsockname()))
 
     def receive_message(self, message):
         self.logger.info("Received message : %s" % str(message))
@@ -44,13 +44,13 @@ class Client(object):
         self.bus.send_message(message)
 
     def disconnect_from_host(self):
+        self.send_message(ClientDisconnectionRequest(self.bus.socket.getsockname()))
         if self.bus is not None:
-            self.send_message(DisconnectionRequest(self.configuration.socket_data))
-            self.send_message(HostShutdownRequest())
             self.bus.shut_down()
+            if self.host is not None:
+                self.host = None
+                self.host_thread.join()
             self.bus = None
-            self.host = None
-            self.host_thread.join()
 
     def shut_down(self):
         if self.state is not None:
