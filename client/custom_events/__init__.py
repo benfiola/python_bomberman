@@ -8,9 +8,9 @@ class InitializeGameData(CustomEvent):
 
 
 class UpdateGameData(CustomEvent):
-    def __init__(self, updated_coordinates):
+    def __init__(self, update_data):
         super().__init__()
-        self.updated_coordinates = updated_coordinates
+        self.update_data = update_data
 
 
 class ViewStateChange(CustomEvent):

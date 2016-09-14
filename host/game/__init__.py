@@ -36,18 +36,14 @@ class Game(object):
     def move_entity(self, client_id, direction):
         entity = self.player_entities[client_id]
         pos = entity.position
-        self.logger.info("Curr position: %s" % str(pos))
-        self.logger.info("Direction: %s" % str(direction))
         new_pos = (pos[0] + direction[0], pos[1] + direction[1])
         if new_pos[0] >= 0 and new_pos[0] < len(self.board) and new_pos[1] >= 0 and new_pos[1] < len(
                 self.board[pos[0]]) and self.board[new_pos[0]][new_pos[1]] is None:
             entity.position = new_pos
             self.board[pos[0]][pos[1]] = None
             self.board[new_pos[0]][new_pos[1]] = entity
-            self.logger.info("New position: %s" % str(new_pos))
             update_data = dict()
-            update_data[pos] = self.board[pos[0]][pos[1]]
-            update_data[new_pos] = self.board[new_pos[0]][new_pos[1]]
+            update_data["entity_move"] = (pos, new_pos)
             self.host.push_custom_event(SendMessage(messages.ClientGameDataUpdate(update_data)))
 
     def start_game(self):
