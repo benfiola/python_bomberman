@@ -78,6 +78,10 @@ class MoveEntityRequest(BaseMessage):
         self.data.direction = direction
 
 
+class AddBombRequest(BaseMessage):
+    def __init__(self):
+        super().__init__()
+
 class MessageData(object):
     def __init__(self):
         super().__init__()

@@ -34,6 +34,10 @@ class MoveEntityEvent(ClientEvent):
         super().__init__(client_id)
         self.direction = direction
 
+class AddBombEvent(ClientEvent):
+    def __init__(self, client_id):
+        super().__init__(client_id)
+
 
 class AssignPlayerEvent(ClientEvent):
     def __init__(self, client_id):

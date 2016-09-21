@@ -81,36 +81,62 @@ class GameRendererSystem(StateBasedRendererSystem):
             window_size = client_configuration.screen_size
             self.block_size = (int(window_size[0]/game_board_size[0]), int(window_size[1]/game_board_size[1]))
             for row in self.state.game_board:
-                for entity in row:
-                    if entity is not None:
+                for entity_list in row:
+                    for entity in entity_list:
                         if entity.sprite is None:
-                            entity.sprite = self.factory.create_sprite(size=self.block_size, bpp=32)
-                            self.transform_sprite(entity)
-                            entity.sprite.position = (entity.position[0] * self.block_size[0], entity.position[1] * self.block_size[1])
+                            self.create_sprite(entity)
+                        if self.update_needed(entity):
+                            old_entities = self.get_entities_at_position(entity.sprite.position)
+                            base_sprite = self.create_sprite(None)
+                            self.update_sprite_position(base_sprite, position=entity.sprite.position)
+                            sprites.append(base_sprite)
+                            for old_entity in old_entities:
+                                self.create_sprite(old_entity)
+                                self.update_sprite_position(old_entity.sprite, entity=old_entity)
+                                sprites.append(old_entity.sprite)
+                            self.update_sprite_position(entity.sprite, entity=entity)
                             sprites.append(entity.sprite)
-                        else:
-                            old_pos = entity.sprite.position
-                            new_pos = (entity.position[0] * self.block_size[0], entity.position[1] * self.block_size[1])
-                            if old_pos[0] != new_pos[0] or old_pos[1] != new_pos[1]:
-                                old_index = (int(old_pos[0]/self.block_size[0]), int(old_pos[1]/self.block_size[1]))
-                                old_entity = self.state.game_board[old_index[0]][old_index[1]]
-                                old_sprite = None
-                                if old_entity is not None:
-                                    old_sprite = old_entity.sprite
-                                else:
-                                    old_sprite = self.factory.create_sprite(size=self.block_size, bpp=32)
-                                    sdl2.ext.fill(old_sprite, (0, 0, 0))
-                                old_sprite.position = old_pos
-                                sprites.append(old_sprite)
-                                entity.sprite.position = new_pos
-                                sprites.append(entity.sprite)
         super().render(sprites)
 
-    def transform_sprite(self, entity):
-        if isinstance(entity, PlayerEntity):
-            sdl2.ext.fill(entity.sprite, (0, 0, 255))
-        if isinstance(entity, DestructibleWallEntity):
-            sdl2.ext.fill(entity.sprite, (128, 128, 128))
-        if isinstance(entity, IndestructibleWallEntity):
-            sdl2.ext.fill(entity.sprite, (255, 255, 255))
+    def create_sprite(self, entity):
+        # create a new sprite, give it a bogus location so that it gets properly updated
+        sprite = self.factory.create_sprite(size=self.block_size, bpp=32)
+        sprite.position = (-255, -255)
+        if entity is None:
+            sdl2.ext.fill(sprite, (0, 0, 0))
+            sprite.depth = 0
+        else:
+            entity.sprite = sprite
+            if isinstance(entity, PlayerEntity):
+                sdl2.ext.fill(sprite, (0, 0, 255))
+                sprite.depth = 3
+            if isinstance(entity, DestructibleWallEntity):
+                sdl2.ext.fill(sprite, (128, 128, 128))
+                sprite.depth = 1
+            if isinstance(entity, IndestructibleWallEntity):
+                sdl2.ext.fill(sprite, (255, 255, 255))
+                sprite.depth = 1
+            if isinstance(entity, BombEntity):
+                sdl2.ext.fill(sprite, (0, 255, 0))
+                sprite.depth = 2
+            if isinstance(entity, FireEntity):
+                sdl2.ext.fill(sprite, (255, 0, 0))
+                sprite.depth = 4
+        return sprite
 
+    def get_entities_at_position(self, pos):
+        index = (int(pos[0] / self.block_size[0]), int(pos[1] / self.block_size[1]))
+        if index[0] >= 0 or index[1] >= 0:
+            return self.state.game_board[index[0]][index[1]]
+        return []
+
+    def update_sprite_position(self, sprite, entity=None, position=None):
+        if entity is not None:
+            sprite.position = (entity.position[0] * self.block_size[0], entity.position[1] * self.block_size[1])
+        if position is not None:
+            sprite.position = (position[0], position[1])
+
+    def update_needed(self, entity):
+        old_pos = entity.sprite.position
+        new_pos = (entity.position[0] * self.block_size[0], entity.position[1] * self.block_size[1])
+        return old_pos[0] != new_pos[0] or old_pos[1] != new_pos[1]

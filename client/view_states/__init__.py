@@ -1,6 +1,7 @@
 import sdl2.ext
 from common.logging import get_logger
 from client import custom_events
+from common.entities import *
 from common.configuration import get_default_game_configuration
 from common.messaging import messages
 from host import get_default_host_config
@@ -145,12 +146,30 @@ class InGameState(GameSubState):
         super().handle_custom_event(event)
         if isinstance(event, custom_events.UpdateGameData):
             for key in event.update_data:
+                if key == "entity_remove":
+                    for entity in event.update_data[key]:
+                        curr_entities = self.state.game_board[entity.position[0]][entity.position[1]]
+                        for curr_entity in list(curr_entities):
+                            if isinstance(curr_entity, entity.__class__):
+                                curr_entities.remove(curr_entity)
+                                break
+                if key == "entity_add":
+                    for entity in event.update_data[key]:
+                        self.state.game_board[entity.position[0]][entity.position[1]].append(entity)
                 if key == "entity_move":
                     (old_pos, new_pos) = event.update_data[key]
-                    entity = self.state.game_board[old_pos[0]][old_pos[1]]
-                    self.state.game_board[old_pos[0]][old_pos[1]] = None
-                    self.state.game_board[new_pos[0]][new_pos[1]] = entity
-                    entity.position = new_pos
+                    old_entities = self.state.game_board[old_pos[0]][old_pos[1]]
+                    new_entities = self.state.game_board[new_pos[0]][new_pos[1]]
+                    player_entity = None
+                    for old_entity in list(old_entities):
+                        if isinstance(old_entity, PlayerEntity):
+                            player_entity = old_entity
+                            old_entities.remove(old_entity)
+                            break
+                    if player_entity is None:
+                        raise Exception("What the heck.")
+                    player_entity.position = new_pos
+                    new_entities.append(player_entity)
 
     def handle_sdl2_event(self, event):
         super().handle_sdl2_event(event)
@@ -163,6 +182,8 @@ class InGameState(GameSubState):
                 self.client.push_custom_event(custom_events.SendMessage(messages.MoveEntityRequest((-1, 0))))
             elif event.key.keysym.sym == sdl2.SDLK_RIGHT:
                 self.client.push_custom_event(custom_events.SendMessage(messages.MoveEntityRequest((1, 0))))
+            elif event.key.keysym.sym == sdl2.SDLK_SPACE:
+                self.client.push_custom_event(custom_events.SendMessage(messages.AddBombRequest()))
 
 
 class MenuState(ViewState):
