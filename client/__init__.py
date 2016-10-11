@@ -72,10 +72,10 @@ class Client(object):
     def log_event(self, event):
         self.logger.debug("Received event %s" % str(event))
 
-    def change_view_state(self, next_state_class):
-        self.logger.info("Changing state to %s" % str(next_state_class.__name__))
+    def change_view_state(self, next_state):
+        self.logger.info("Changing state to %s" % str(next_state.__class__.__name__))
         self.state.clean_up()
-        self.state = next_state_class(self)
+        self.state = next_state
         self.window.change_renderer(self.state)
 
     def run(self):

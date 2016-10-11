@@ -37,7 +37,7 @@ class MenuRendererSystem(StateBasedRendererSystem):
     def render(self, sprites=[], x=None, y=None):
         sprites = []
         sdl2.ext.fill(self.surface, sdl2.ext.Color(255, 0, 0))
-        if isinstance(self.state.substate, MenuSubState):
+        if isinstance(self.state, MenuState):
             text = self.factory.from_text(text="Press enter to start", fontmanager=self.fontmanager)
             text.position = (0, (int(client_configuration.screen_size[1] / 2)) - 16)
             sprites.append(text)
@@ -55,7 +55,7 @@ class GameRendererSystem(StateBasedRendererSystem):
 
     def render(self, sprites=[], x=None, y=None):
         sprites = []
-        if isinstance(self.state.substate, PreGameState):
+        if isinstance(self.state, PreGameState):
             sdl2.ext.fill(self.surface, sdl2.ext.Color(0, 0, 0))
             text = self.factory.from_text(text="Press q to host a game", fontmanager=self.fontmanager)
             text.position = (0, (int(client_configuration.screen_size[1] / 2)) - 16)
@@ -63,17 +63,17 @@ class GameRendererSystem(StateBasedRendererSystem):
             text = self.factory.from_text(text="Press w to connect to a game", fontmanager=self.fontmanager)
             text.position = (0, int(client_configuration.screen_size[1] / 2))
             sprites.append(text)
-        if isinstance(self.state.substate, HostStartedGameState):
+        if isinstance(self.state, HostStartedGameState):
             sdl2.ext.fill(self.surface, sdl2.ext.Color(0, 0, 0))
             text = self.factory.from_text(text="Press e to start the game", fontmanager=self.fontmanager)
             text.position = (0, int(client_configuration.screen_size[1] / 2))
             sprites.append(text)
-        if isinstance(self.state.substate, ClientStartedGameState):
+        if isinstance(self.state, ClientStartedGameState):
             sdl2.ext.fill(self.surface, sdl2.ext.Color(0, 0, 0))
             text = self.factory.from_text(text="Waiting for host to start game", fontmanager=self.fontmanager)
             text.position = (0, int(client_configuration.screen_size[1] / 2))
             sprites.append(text)
-        if isinstance(self.state.substate, InGameState):
+        if isinstance(self.state, InGameState):
             # on first draw clear the screen - we should do better than this check though
             if self.block_size is None:
                 sdl2.ext.fill(self.surface, sdl2.ext.Color(0, 0, 0))
