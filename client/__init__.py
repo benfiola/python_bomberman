@@ -1,12 +1,12 @@
-from . import platform
-import uuid, sys, sdl2, sdl2.ext, threading
-from common import get_logger
-from common.messaging.messages import *
-from .messaging import ClientMessageBus
-from host import Host
-from .graphics import *
-from .view_states import *
-from .custom_events import *
+#from . import platform
+#import uuid, sys, sdl2, sdl2.ext, threading
+#from common import get_logger
+#from common.messaging.messages import *
+#from .messaging import ClientMessageBus
+#from host import Host
+#from .graphics import *
+#from .view_states import *
+#from .custom_events import *
 
 
 class Client(object):
