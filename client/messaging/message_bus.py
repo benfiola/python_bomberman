@@ -1,103 +1,195 @@
 import threading
 import socket
 import pickle
+from .messages import IdentifyRequest, RequestFail, RequestSuccess
+
 
 class MessageBus(object):
     def __init__(self):
-        self.socket = None
+        self.connections_by_id = {}
+        self.connections_by_target_address = {}
         self.shutting_down = False
         self.send_queue = []
-        self.threads = []
 
     def start(self):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+        pass
 
     def stop(self):
-        pass
+        self.shutting_down = True
+        self.disconnect()
 
     def connect(self):
-        """
-        Connect to a target
-        """
         pass
 
-    def disconnect(self):
-        """
-        Disconnect from a target
-        """
-        pass
+    def add_connection(self, connection):
+        if connection.id is not None:
+            if connection.id in self.connections_by_id:
+                self.disconnect(connection_id=connection.id)
+            self.connections_by_id[connection.id] = connection
+        self.connections_by_target_address[connection.target_address] = connection
 
-    def send(self, message):
-        """
-        Sends a message to the target
-        :param message: Python object representing a message to be pickled.
-        """
-        pass
+    def identify_connection(self, connection, connection_id):
+        connection.id = connection_id
+        self.connections_by_id[connection.id] = connection
 
-    def receive(self):
-        """
-        Receives a message from a target
-        :param message:
-        :return:
-        """
+    def disconnect(self, connection_id=None, connection_target_address=None):
+        if connection_id is not None:
+            if connection_id in self.connections_by_id:
+                connection = self.connections_by_id.pop(connection_id)
+                self.connections_by_target_address.pop(connection.target_address)
+                connection.close()
+            else:
+                raise ClientNotFoundException(connection_id)
+        elif connection_target_address is not None:
+            if connection_target_address in self.connections_by_target_address:
+                connection = self.connections_by_target_address.pop(connection_target_address)
+                if connection.id in self.connections_by_id:
+                    self.connections_by_id.pop(connection.id)
+                connection.close()
+            else:
+                raise ClientNotFoundException("%s:%d" % connection_target_address)
+        else:
+            for connection in self.connections_by_target_address.values():
+                connection.close()
+            self.connections_by_target_address = {}
+            self.connections_by_id = {}
+
+    def send(self, message, connection_id=None):
+        if connection_id is not None:
+            if connection_id in self.connections_by_id:
+                self.connections_by_id[connection_id].send(message)
+            else:
+                raise ClientNotFoundException(connection_id)
+        else:
+            for connection in self.connections_by_id.values():
+                connection.send(message)
+
 
 class ClientMessageBus(MessageBus):
-    """
-    A client typically is just a single socket connected to a host
-    """
-    def __init__(self):
+    def __init__(self, client_id, host_address):
         super().__init__()
+        self.client_id = client_id
+        self.host_address = host_address
 
     def start(self):
         super().start()
-        self.socket.connect(('localhost'), 40000)
-        connection_thread = threading.Thread(name="client-connection-thread", target=self.handle_host)
+        connection = Connection("host", target_address=self.host_address)
+        self.add_connection(connection)
+        connection.send(IdentifyRequest(self.client_id))
+        print("client started")
 
-    def handle_host(self):
-        def func():
-            while not self.shutting_down:
-
-
-
+    def stop(self):
+        print("client stopping")
+        super().stop()
 
 
 class HostMessageBus(MessageBus):
-    """
-    A host features a single port used to listen in on connection requests.
-
-    When it receives a connection request, it creates a new socket and continues the conversation on that socket in
-    a separate thread..
-    """
     def __init__(self):
         super().__init__()
+        self.listener_socket = None
+        self.listener_address = (socket.gethostname(), 40000)
+        self.listener_thread = None
 
     def start(self):
         super().start()
-        self.socket.bind((socket.gethostname(), 40000))
-        self.socket.listen(5)
-        listener_thread = threading.Thread(name="host-listener-thread", target=self.accept_connections)
-        self.threads.append(listener_thread)
-        listener_thread.start()
+        self.listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.listener_socket.bind(('', self.listener_address[1]))
+        self.listener_socket.listen()
+        self.listener_thread = threading.Thread(name="host-listener-thread", target=self.listen)
+        self.listener_thread.start()
+        print("host started")
 
-    def accept_connections(self):
+    def stop(self):
+        print("host stopping")
+        super().stop()
+        close_listener_target = ('localhost', self.listener_address[1])
+        close_listener_connection = Connection("close_listener", target_address=close_listener_target)
+        close_listener_connection.close()
+        try:
+            self.listener_socket.shutdown(socket.SHUT_RDWR)
+        except Exception as e:
+            # If this fails, there's nothing we can do.
+            pass
+        self.listener_socket.close()
+        self.listener_thread.join()
+
+    def listen(self):
         while not self.shutting_down:
-            (client_socket, client_address) = self.socket.accept()
-            connection_thread = threading.Thread(name="host-connection-thread-%s" % (client_address), target=self.handle_client(client_socket, client_address))
-            self.threads.append(connection_thread)
-            connection_thread.start()
+            (client_socket, client_address) = self.listener_socket.accept()
+            print("host accepted connection from %s" % str(client_address))
+            connection = Connection(client_address, target_socket=client_socket)
+            self.add_connection(connection)
+        print("no listening")
 
-    def handle_client(self, client_socket, client_address):
-        def func():
-            while not self.shutting_down:
-                
-                data = client_socket.recv(32768)
-                if data is None:
+
+class Connection(object):
+    def __init__(self, connection_id, target_address=None, target_socket=None):
+        self.id = connection_id
+        if target_socket is not None:
+            self.socket = target_socket
+        elif target_address is not None:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect(target_address)
+        self.target_address = self.socket.getpeername()
+        self.shutting_down = False
+        self.thread = threading.Thread(name="connection-thread-%s" % str(connection_id), target=self.handle)
+        self.send_queue = []
+        self.thread.start()
+
+    def send(self, message):
+        self.send_queue.append(message)
+
+    def get_messages_to_send(self):
+        to_return = list(self.send_queue)
+        self.send_queue = []
+        return to_return
+
+    def _send(self, message):
+        if not self.shutting_down:
+            self.socket.sendall(pickle.dumps(message))
+
+    def _receive(self, size=32768):
+        if not self.shutting_down:
+            try:
+                data = self.socket.recv(size).strip()
+            except Exception as e:
+                # If this fails, then something is wrong with our socket.
+                data = None
+            if not data:
+                self.shutting_down = True
+            return data
+        return None
+
+    def handle(self):
+        while not self.shutting_down:
+            messages_to_send = self.get_messages_to_send()
+            for message in messages_to_send:
+                self._send(message)
+                data = self._receive()
+                if not data:
                     break
                 data = pickle.loads(data)
                 print(data)
-        return func
+            data = self._receive()
+            if not data:
+                break
+            print(data)
+            data = pickle.loads(data)
+            print(data)
+        print("connection closed")
+
+    def close(self):
+        self.shutting_down = True
+        self.socket.shutdown(socket.SHUT_RDWR)
+        self.socket.close()
+        self.thread.join()
 
 
+class ConnectionException(Exception):
+    def __init__(self, message):
+        super().__init__(message)
 
 
+class ClientNotFoundException(ConnectionException):
+    def __init__(self, message):
+        super().__init__(message)
