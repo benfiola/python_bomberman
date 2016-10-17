@@ -1,24 +1,25 @@
 import unittest
 import time
 from .message_bus import HostMessageBus, ClientMessageBus
+from .messages import *
 
 
 class TestMessageBus(unittest.TestCase):
     def setUp(self):
-        self.host = HostMessageBus()
-        self.client_one = ClientMessageBus("client1", self.host.listener_address)
-        self.client_two = ClientMessageBus("client2", self.host.listener_address)
-        self.client_three = ClientMessageBus("client3", self.host.listener_address)
+        self.host = HostMessageBus("host")
+        self.client = ClientMessageBus("client1", self.host.listener_address)
 
     def tearDown(self):
-        pass
+        self.host.stop()
+        self.client.stop()
 
     def test_initialize(self):
         self.host.start()
-        self.client_one.start()
-        self.client_two.start()
-        self.client_one.stop()
-        self.client_three.start()
-        self.client_three.stop()
-        self.client_two.stop()
-        self.host.stop()
+        time.sleep(1)
+        self.client.start()
+        time.sleep(1)
+        self.host.send(PrintRequest("Host says hi."))
+        time.sleep(1)
+        self.client.send(PrintRequest("Client says hi."))
+        time.sleep(1)
+
