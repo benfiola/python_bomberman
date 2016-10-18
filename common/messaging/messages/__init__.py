@@ -1,97 +1,52 @@
-
-
-# A connection request is issued from the client to the host asking the host to complete
-# a bidirectional communication channel between client and host via socket.
 class BaseMessage(object):
     def __init__(self):
-        self.data = MessageData()
-
-    def __str__(self):
-        return "%s:[%s]" % (self.__class__.__name__, str(self.data))
+        pass
 
 
-class ClientConnectionRequest(BaseMessage):
-    def __init__(self, socket_data):
-        super().__init__()
-        self.data.socket_data = socket_data
-
-
-class ClientDisconnectionRequest(BaseMessage):
-    def __init__(self, socket_data):
-        super().__init__()
-        self.data.socket_data = socket_data
-
-
-class HostShutdownRequest(BaseMessage):
+class BaseRequest(BaseMessage):
     def __init__(self):
         super().__init__()
 
 
-class PrintMessageRequest(BaseMessage):
+class PrintRequest(BaseRequest):
     def __init__(self, message):
         super().__init__()
-        self.data.message = message
+        self.message = message
 
 
-class SuccessfulResponse(BaseMessage):
+class IdentifyRequest(BaseRequest):
+    def __init__(self, client_id, target_address):
+        super().__init__()
+        self.client_id = client_id
+        self.target_address = target_address
+
+
+class BaseResponse(BaseMessage):
     def __init__(self):
         super().__init__()
 
 
-class FailedResponse(BaseMessage):
-    def __init__(self, error):
+class RequestFail(BaseResponse):
+    def __init__(self, data):
         super().__init__()
-        self.data.error = error
+        self.data = data
 
 
-class InitializeGameRequest(BaseMessage):
-    def __init__(self, configuration):
-        super().__init__()
-        self.data.configuration = configuration
-
-
-class AssignPlayerEntityRequest(BaseMessage):
+class RequestSuccess(BaseResponse):
     def __init__(self):
         super().__init__()
 
 
-class StartGameRequest(BaseMessage):
+class BaseStatus(BaseMessage):
     def __init__(self):
         super().__init__()
 
 
-class ClientGameDataRequest(BaseMessage):
-    def __init__(self, game_board):
-        super().__init__()
-        self.data.game_board = game_board
-
-
-class ClientGameDataUpdate(BaseMessage):
-    def __init__(self, coord_map):
-        super().__init__()
-        self.data.updated_coordinates = coord_map
-
-
-class MoveEntityRequest(BaseMessage):
-    def __init__(self, direction):
-        super().__init__()
-        self.data.direction = direction
-
-
-class AddBombRequest(BaseMessage):
+class SocketReceiveTimeout(BaseStatus):
     def __init__(self):
         super().__init__()
 
-class MessageData(object):
+
+class SocketClosed(BaseStatus):
     def __init__(self):
         super().__init__()
-
-    def __getattr__(self, key):
-        if key not in ["__getstate__", "__setstate__"]:
-            setattr(self, key, None)
-        else:
-            raise AttributeError(key)
-
-
-
-

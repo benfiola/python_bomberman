@@ -1,4 +1,4 @@
-from common.logging import get_logger
+from common.app_logging import get_logger
 from common.maps.spawns import *
 from common.entities import *
 from host.custom_events import *

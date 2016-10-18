@@ -1,5 +1,5 @@
 import uuid
-from common.logging import get_logger
+from common.app_logging import get_logger
 from .messaging import HostMessageBus
 from common.messaging.messages import *
 from common.configuration import host_configuration

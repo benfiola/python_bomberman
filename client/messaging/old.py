@@ -1,6 +1,6 @@
 import socketserver, socket, threading, pickle, logging
 from common.messaging import *
-from common.logging import get_logger
+from common.app_logging import get_logger
 
 
 class ClientMessageBus(MessageBus):

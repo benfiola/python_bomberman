@@ -1,5 +1,5 @@
 import sdl2.ext
-from common.logging import get_logger
+from common.app_logging import get_logger
 from client import custom_events
 from common.entities import *
 from common.configuration import get_default_game_configuration
