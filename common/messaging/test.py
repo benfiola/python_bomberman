@@ -30,4 +30,3 @@ class TestMessageBus(unittest.TestCase):
         self.client_two.send(PrintRequest("Client two says hi."), blocking=True)
         self.client_three.send(PrintRequest("Client three says hi."), blocking=True)
         self.client_four.send(PrintRequest("Client four says hi."), blocking=True)
-

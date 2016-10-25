@@ -1,6 +1,8 @@
+import uuid
+
 class BaseMessage(object):
     def __init__(self):
-        pass
+        self.id = str(uuid.uuid4())
 
 
 class BaseRequest(BaseMessage):
@@ -22,19 +24,20 @@ class IdentifyRequest(BaseRequest):
 
 
 class BaseResponse(BaseMessage):
-    def __init__(self):
+    def __init__(self, request_id):
         super().__init__()
+        self.request_id = request_id
 
 
 class RequestFail(BaseResponse):
-    def __init__(self, data):
-        super().__init__()
+    def __init__(self, request_id, data):
+        super().__init__(request_id)
         self.data = data
 
 
 class RequestSuccess(BaseResponse):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, request_id):
+        super().__init__(request_id)
 
 
 class BaseStatus(BaseMessage):
@@ -50,3 +53,9 @@ class SocketReceiveTimeout(BaseStatus):
 class SocketClosed(BaseStatus):
     def __init__(self):
         super().__init__()
+
+
+class IncomingRequest(BaseMessage):
+    def __init__(self, size):
+        super().__init__()
+        self.size = size

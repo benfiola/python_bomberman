@@ -1,7 +1,7 @@
 import threading
 import socket
+import select
 import pickle
-import copy
 from .messages import *
 from ..app_logging import create_logger
 
@@ -14,8 +14,7 @@ class MessageBus(object):
         A message bus facilitates communication between two different machines.
 
         A messsage bus has a map of connections that belong to the bus.  Each connection has its own queue
-        for sending messages, however, the bus itself has the queue for receiving messages as a connection
-        has no context for what to do with the data it receives.
+        for sending and receiving messages.
 
         When initializing a connection, will first establish the connection and then send an 'IdentifyRequest' that will
         inform the remote MessageBus to tag this socket address and port with the UUID of the parent class.
@@ -28,26 +27,21 @@ class MessageBus(object):
         self.owner_id = owner_id
         self.connections_by_id = {}
         self.connections_by_target_address = {}
+        self.pending_requests_lock = threading.Lock()
+        self.pending_requests = {}
         self.shutting_down = False
-        self.request_queue_lock = threading.Lock()
-        self.request_queue = []
-        self.request_queue_thread = threading.Thread(name="request-processor-thread", target=self._process_received_requests)
-        self.request_queue_startup_event = threading.Event()
 
     def start(self, *args, **kwargs):
         """
-        Starts the threads that manage both the send and receive queues of the bus.
-        :return:
+        Start the message bus.
         """
-        self.request_queue_thread.start()
-        self.request_queue_startup_event.wait()
+        pass
 
-    def send(self, message, target_address=None, blocking=False):
+    def send(self, message, target_address=None, blocking=True):
         """
         Sends a message to connected clients (via broadcast).
         :param message: Any message that is pickleable.
         :param target_address: Specify target_address to send message to
-        :param blocking: Block function until message received by targets
         :return:
         """
         # Since the IdentifyRequest seeks to add a connection to the connections_by_ids map, there's no way
@@ -58,28 +52,20 @@ class MessageBus(object):
             if target_address in self.connections_by_target_address:
                 connections = [self.connections_by_target_address[target_address]]
             else:
-                raise ClientNotFoundException(client_target_address=target_address)
+                exc = ClientNotFoundException(client_target_address=target_address)
+                self.logger.info(str(exc))
+                raise exc
 
-        # If we're supposed to block on sending this message, let's keep an array of locks for each connection -
-        # only when all locks are released, can we proceed to exit this function.
-        connection_locks = []
+        if blocking and len(connections) > 0:
+            with self.pending_requests_lock:
+                self.pending_requests[message.id] = (threading.Event(), len(connections))
+
         for connection in connections:
-            # we make a deep copy of the message - if we're doing a blocking connection, we'll need to give each
-            # connection message it's own lock to release when finished sending.
-            connection_message = copy.deepcopy(message)
-            if blocking:
-                new_lock = threading.Event()
-                connection_locks.append(new_lock)
+            connection.send(message)
 
-                # messages have this set as a volatile attribute because we don't want to send this over the wire -
-                # it gets deleted from the object right before the data is sent over the wire.
-                setattr(connection_message, "send_lock", new_lock)
-            connection.send(connection_message)
-
-        # If non-blocking, connection_locks will be empty, otherwise, it should contain a lock for every connection
-        # we sent our message to.
-        for lock in connection_locks:
-            lock.wait()
+        if blocking and len(connections) > 0:
+            request_lock, _ = self.pending_requests[message.id]
+            request_lock.wait()
 
     def stop(self):
         """
@@ -88,7 +74,6 @@ class MessageBus(object):
         """
         self.shutting_down = True
         self._close_connections()
-        self.request_queue_thread.join()
 
     def _new_connection(self, target_address=None, target_socket=None, blocking=True):
         """
@@ -96,14 +81,16 @@ class MessageBus(object):
         Will subsequently send a IdentifyRequest to the target to inform the remote machine of this machine's unique ID.
         :param target_address: specifies a target to connect a new socket to
         :param target_socket: use this pre-existing socket
-        :param blocking: when set, will block until server receives IdentifyRequest
         :return: a Connection object.
         """
         if target_socket is not None:
-            connection = Connection(request_callback=self._add_received_request, target_socket=target_socket)
+            connection = Connection(owner_name=self.owner_id, request_callback=self._process_request, target_socket=target_socket)
         else:
-            connection = Connection(request_callback=self._add_received_request, target_address=target_address)
+            connection = Connection(owner_name=self.owner_id, request_callback=self._process_request, target_address=target_address)
         self.connections_by_target_address[connection.target_address] = connection
+        connection.start()
+        self.logger.info("Accepted connection with %s" % str(connection.target_address))
+
         self.send(IdentifyRequest(self.owner_id, connection.source_address), target_address=connection.target_address, blocking=blocking)
         return connection
 
@@ -114,7 +101,9 @@ class MessageBus(object):
         :return:
         """
         if request.target_address not in self.connections_by_target_address:
-            raise ClientNotFoundException(client_target_address=request.target_address)
+            exc = ClientNotFoundException(client_target_address=request.target_address)
+            self.logger.info(str(exc))
+            raise exc
         connection = self.connections_by_target_address[request.target_address]
         connection.id = request.client_id
         self.connections_by_id[connection.id] = connection
@@ -130,41 +119,26 @@ class MessageBus(object):
         self.connections_by_target_address = {}
         self.connections_by_id = {}
 
-    def _requests_to_process(self):
+    def _process_request(self, request):
         """
-        Fetches the current snapshot of queued requests to process, resets the queue.
+        Process a single request received from a connection.
         :return:
         """
-        with self.request_queue_lock:
-            messages = list(self.request_queue)
-            self.request_queue = []
-            return messages
-
-    def _add_received_request(self, request):
-        """
-        Will add newly fetched request data to our processing queue.
-        :param request: Any type of BaseMessage.
-        :return:
-        """
-        with self.request_queue_lock:
-            self.request_queue.append(request)
-
-    def _process_received_requests(self):
-        """
-        This will process any requests that deal with the MessageBus directly, then passing these requests to a callback
-        for further processing.
-        :return:
-        """
-        self.request_queue_startup_event.set()
-        while not self.shutting_down:
-            requests = self._requests_to_process()
-            for request in requests:
-                if isinstance(request, IdentifyRequest):
-                    self._identify_connection(request)
-                if isinstance(request, PrintRequest):
-                    self.logger.info("Received print message: %s" % request.message)
-                if self.request_callback is not None:
-                    self.request_callback(request)
+        if isinstance(request, IdentifyRequest):
+            self._identify_connection(request)
+        if isinstance(request, BaseResponse):
+            with self.pending_requests_lock:
+                (lock, num_waiting) = self.pending_requests[request.request_id]
+                num_waiting -= 1
+                if num_waiting == 0:
+                    self.pending_requests.pop(request.request_id)
+                    lock.set()
+                else:
+                    self.pending_requests[request.request_id] = (lock, num_waiting)
+        if isinstance(request, PrintRequest):
+            self.logger.info("Received print message: %s" % request.message)
+        if self.request_callback is not None:
+            self.request_callback(request)
 
 
 class ClientMessageBus(MessageBus):
@@ -178,7 +152,6 @@ class ClientMessageBus(MessageBus):
         self.host_address = None
 
     def start(self, host_address):
-        self.logger.info("Starting client message bus")
         super().start()
         self.host_address = host_address
         self._new_connection(target_address=self.host_address)
@@ -197,11 +170,11 @@ class HostMessageBus(MessageBus):
         super().__init__(owner_id, request_callback)
         self.listener_address = (socket.gethostname(), 40000)
         self.listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.listener_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.listener_thread = threading.Thread(name="host-listener-thread", target=self._listen)
         self.listener_thread_startup_event = threading.Event()
 
     def start(self):
-        self.logger.info("Starting host message bus")
         super().start()
         self.listener_socket.bind(('', self.listener_address[1]))
         self.listener_socket.listen()
@@ -236,21 +209,11 @@ class HostMessageBus(MessageBus):
 
 
 class Connection(object):
-    def __init__(self, request_callback=None, target_address=None, target_socket=None):
+    def __init__(self, owner_name=None, request_callback=None, target_address=None, target_socket=None):
         """
         A connection is a wrapper over the typical socket objects that dictate machine to machine communication.
 
         Unless a target_socket is provided, it will create a new socket with the passed-in target_address.
-
-        Since I'm not really wanting to implement non-blocking sockets here, I've instead given sockets a very short
-        timeout.
-
-        The thread itself is managed on its own thread, called the 'connection_thread'.
-
-        Inside this thread, oddly enough, both sending and receiving happens.  The only thing that needs queueing
-        is messages that we plan to send - the idea is that the request_callback will bubble up received data
-        somewhere for better processing - a Connection has no context or concept of what to do with the data it
-        receives, so it makes no sense for it to hold any received data.
 
         :param request_callback: The callback to pass requests up the chain - usually belongs to the message bus.
         :param target_address: The address to connect a new socket to.
@@ -260,20 +223,36 @@ class Connection(object):
         self.id = None
         self.shutting_down = False
         self.request_callback = request_callback
+
+        receive_thread_name = "connection_receive_thread"
+        send_thread_name = "connection_send_thread"
+        if owner_name is not None:
+            receive_thread_name = "%s-connection_receive_thread" % owner_name
+            send_thread_name = "%s-connection_send_thread" % owner_name
+
         self.send_queue = []
         self.send_queue_lock = threading.Lock()
+        self.send_thread_start_event = threading.Event()
+        self.send_thread = threading.Thread(name=send_thread_name, target=self._handle_send)
+        self.receive_thread_start_event = threading.Event()
+        self.receive_thread = threading.Thread(name=receive_thread_name, target=self._handle_receive)
 
         if target_socket is not None:
             self.socket = target_socket
         elif target_address is not None:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect(target_address)
-        self.socket.settimeout(0.1)
         self.source_address = self.socket.getsockname()
         self.target_address = self.socket.getpeername()
+        self.owner_name = owner_name
 
-        self.thread = threading.Thread(name="connection-thread", target=self._handle)
-        self.thread.start()
+    def start(self):
+        self.send_thread_start_event.clear()
+        self.receive_thread_start_event.clear()
+        self.send_thread.start()
+        self.receive_thread.start()
+        self.send_thread_start_event.wait()
+        self.receive_thread_start_event.wait()
 
     def send(self, message):
         with self.send_queue_lock:
@@ -286,13 +265,18 @@ class Connection(object):
         except OSError:
             pass
         self.socket.close()
-        self.thread.join()
+        self.send_thread.join()
+        self.receive_thread.join()
+        self.send_thread_start_event.clear()
+        self.receive_thread_start_event.clear()
 
-    def _messages_to_send(self):
+    def _pop_message(self):
         with self.send_queue_lock:
-            to_return = list(self.send_queue)
-            self.send_queue = []
-            return to_return
+            return self.send_queue.pop()
+
+    def _has_messages(self):
+        with self.send_queue_lock:
+            return len(self.send_queue) > 0
 
     def _socket_send(self, message):
         """
@@ -302,10 +286,35 @@ class Connection(object):
         :return:
         """
         if not self.shutting_down:
-            self.logger.debug("Sending message %s" % message.__class__.__name__)
-            self.socket.sendall(pickle.dumps(message))
+            try:
+                pickled_message = pickle.dumps(message)
+                incoming_request = pickle.dumps(IncomingRequest(len(pickled_message)))
+                self.socket.sendall(incoming_request)
+                self.socket.sendall(pickled_message)
+            except OSError as e:
+                print(e)
 
-    def _socket_receive(self, size=32768):
+    def _can_receive(self):
+        try:
+            inputs, _, closed = select.select([self.socket], [], [self.socket], 0.1)
+        except OSError:
+            inputs = []
+            closed = [self.socket]
+        if len(closed) > 0:
+            self.shutting_down = True
+        return len(inputs) > 0 and not self.shutting_down
+
+    def _can_write(self):
+        try:
+            _, outputs, closed = select.select([], [self.socket], [self.socket], 0.1)
+        except OSError:
+            closed = [self.socket]
+            outputs = []
+        if len(closed) > 0:
+            self.shutting_down = True
+        return len(outputs) > 0 and not self.shutting_down
+
+    def _socket_receive(self, size=4096):
         """
         Receives a Python object message over socket, using pickle to deserialize.
         :param size: Maximum number of bytes to read over socket.
@@ -313,13 +322,12 @@ class Connection(object):
         """
         if not self.shutting_down:
             try:
-                data = self.socket.recv(size).strip()
+                data = self.socket.recv(size)
 
                 # If data is None, this means that the socket was closed
                 if not data:
                     return SocketClosed()
                 data = pickle.loads(data)
-                self.logger.debug("Received message %s" % data.__class__.__name__)
                 return data
             # Since we're setting a timeout for recv, if this exception gets thrown, the recv call timedout.
             except socket.timeout:
@@ -327,6 +335,8 @@ class Connection(object):
             # If we get an OSError, odds are this socket is closed.
             except OSError:
                 return SocketClosed()
+            except Exception as e:
+                self.logger.error(e)
         # Finally, if we're shutting down, there's no point in reading - just return a SocketClosed object
         return SocketClosed()
 
@@ -341,38 +351,27 @@ class Connection(object):
         """
         if isinstance(data, SocketClosed):
             self.shutting_down = True
-        if isinstance(data, BaseRequest):
+        if isinstance(data, BaseRequest) or isinstance(data, BaseResponse):
             if self.request_callback is not None:
                 self.request_callback(data)
-                self._socket_send(RequestSuccess())
+        if isinstance(data, BaseRequest):
+            self.send(RequestSuccess(data.id))
 
-    def _handle(self):
+    def _handle_send(self):
+        self.send_thread_start_event.set()
         while not self.shutting_down:
-            messages_to_send = self._messages_to_send()
-            for message in messages_to_send:
-                # If this message has a send_lock, the sender is waiting for us to notify it that the message has been
-                # sent and received by the target.
-                send_lock = getattr(message, "send_lock", None)
-                if send_lock:
-                    # We delete this attribute from the message so that it isn't pickled when sent to the target.
-                    delattr(message, "send_lock")
+            if self._can_write() and self._has_messages():
+                self._socket_send(self._pop_message())
 
-                self._socket_send(message)
-                data = self._socket_receive()
-
-                # Process requests as usual, but keep an eye out for server responses - we effectively block
-                # any other data being sent over the wire until the target acknowledges its receipt of our message
-                while not isinstance(data, BaseResponse) and not self.shutting_down:
+    def _handle_receive(self):
+        self.receive_thread_start_event.set()
+        while not self.shutting_down:
+            if self._can_receive():
+                # receive a message
+                data = self._socket_receive(size=123)
+                if isinstance(data, IncomingRequest):
+                    data = self._socket_receive(data.size)
                     self._process_data(data)
-                    data = self._socket_receive()
-
-                # Notify waiting threads that we've sent this message if we have a lock,
-                # because by this point we've received a response.
-                if send_lock:
-                    send_lock.set()
-            # If we're not sending anything, we're just collecting socket messages one at a time and processing them.
-            data = self._socket_receive()
-            self._process_data(data)
 
 
 class ConnectionException(Exception):
