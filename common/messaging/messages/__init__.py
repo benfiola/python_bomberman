@@ -1,5 +1,6 @@
 import uuid
 
+
 class BaseMessage(object):
     def __init__(self):
         self.id = str(uuid.uuid4())
@@ -51,8 +52,9 @@ class SocketReceiveTimeout(BaseStatus):
 
 
 class SocketClosed(BaseStatus):
-    def __init__(self):
+    def __init__(self, target_address):
         super().__init__()
+        self.target_address = target_address
 
 
 class IncomingRequest(BaseMessage):
