@@ -31,9 +31,9 @@ class BaseResponse(BaseMessage):
 
 
 class RequestFail(BaseResponse):
-    def __init__(self, request_id, data):
+    def __init__(self, request_id, message):
         super().__init__(request_id)
-        self.data = data
+        self.message = message
 
 
 class RequestSuccess(BaseResponse):

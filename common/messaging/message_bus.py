@@ -26,8 +26,8 @@ class MessageBus(object):
         self.connections_lock = threading.Lock()
         self.connections_by_id = {}
         self.connections_by_target_address = {}
-        self.pending_requests_lock = threading.Lock()
-        self.pending_requests = {}
+        self.blocking_requests_lock = threading.Lock()
+        self.blocking_requests = {}
         self.shutting_down = False
 
     def start(self, *args, **kwargs):
@@ -52,16 +52,15 @@ class MessageBus(object):
             elif target_address:
                 raise ClientNotFoundException(client_target_address=target_address)
 
-        if blocking and len(connections) > 0:
-            with self.pending_requests_lock:
-                self.pending_requests[message.id] = (threading.Event(), len(connections))
+        if blocking:
+            with self.blocking_requests_lock:
+                self.blocking_requests[message.id] = BlockingRequest(connections)
 
         for connection in connections:
             connection.send(message)
 
-        if blocking and len(connections) > 0:
-            request_lock, _ = self.pending_requests[message.id]
-            request_lock.wait()
+        if blocking:
+            self.blocking_requests[message.id].wait()
 
     def stop(self):
         """
@@ -117,24 +116,25 @@ class MessageBus(object):
             self.connections_by_target_address = {}
             self.connections_by_id = {}
 
-    def _process_data(self, data):
+    def _process_data(self, data, connection):
         """
         Process a single request received from a connection.
         :return:
         """
         if isinstance(data, SocketClosed):
-            self.logger.error("Socket at %s closed." % str(data.target_address))
+            self.logger.error("Socket closed %s" % str(connection.target_address))
+            with self.blocking_requests_lock:
+                for blocking_request in self.blocking_requests.values():
+                    blocking_request.notify(data.target_address)
         if isinstance(data, IdentifyRequest):
             self._identify_connection(data)
         if isinstance(data, BaseResponse):
-            with self.pending_requests_lock:
-                (lock, num_waiting) = self.pending_requests[data.request_id]
-                num_waiting -= 1
-                if num_waiting == 0:
-                    self.pending_requests.pop(data.request_id)
-                    lock.set()
-                else:
-                    self.pending_requests[data.request_id] = (lock, num_waiting)
+            if isinstance(data, RequestFail):
+                self.logger.error("Request failed from %s : %s" % (str(connection.target_address), str(data.message)))
+            with self.blocking_requests_lock:
+                if data.request_id in self.blocking_requests:
+                    blocking_request = self.blocking_requests[data.request_id]
+                    blocking_request.notify(connection.target_address)
         if isinstance(data, PrintRequest):
             self.logger.info("Received print message: %s" % data.message)
         if self.request_callback is not None:
@@ -347,7 +347,7 @@ class Connection(object):
         response = None
         if self.data_process_callback is not None:
             try:
-                self.data_process_callback(data)
+                self.data_process_callback(data, self)
                 if isinstance(data, BaseRequest):
                     response = RequestSuccess(data.id)
             except Exception as e:
@@ -391,3 +391,27 @@ class ClientNotFoundException(ConnectionException):
         elif client_target_address is not None:
             message = "Client %s:%d not found." % client_target_address
         super().__init__(message)
+
+
+class BlockingRequest(object):
+    """
+    Container to manage blocking requests.
+    Holds a lock as well as a list of connections that a request is being sent to.
+
+    Upon receipt of a response from these connections OR
+    if the socket used in the connetion is closed, will
+    check upon pending connection responses and unblock as necessary.
+    """
+    def __init__(self, connections):
+        self.event = threading.Event()
+        self.connections = {connection.target_address for connection in connections}
+
+    def wait(self):
+        if len(self.connections) > 0:
+            self.event.wait()
+
+    def notify(self, target_address):
+        if target_address in self.connections:
+            self.connections.remove(target_address)
+            if len(self.connections) == 0:
+                self.event.set()

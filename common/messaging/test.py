@@ -68,6 +68,7 @@ class TestMessageBus(unittest.TestCase):
         # at this point, we know that the host and client can create themselves, start themselves and then
         # communicate with one another.
 
+
 class InstrumentedClientMessageBus(ClientMessageBus):
     def __init__(self, owner_id):
         super().__init__(owner_id, request_callback=self.collect)
