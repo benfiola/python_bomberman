@@ -107,9 +107,13 @@ class MessageBus(object):
 
     def _close_connections(self):
         """
-        Closes all connections that this bus knows of, and resets the connection maps.
+        Unblocks all blocking connections, closes all connections that this bus knows of, and resets the connection maps.
         :return:
         """
+        with self.blocking_requests_lock:
+            for blocking_request in self.blocking_requests.values():
+                blocking_request.notify()
+
         with self.connections_lock:
             for connection in self.connections_by_target_address.values():
                 connection.close()
@@ -121,8 +125,10 @@ class MessageBus(object):
         Process a single request received from a connection.
         :return:
         """
-        if isinstance(data, SocketClosed):
-            self.logger.error("Socket closed %s" % str(connection.target_address))
+        if self.request_callback is not None:
+            self.request_callback(data)
+        if isinstance(data, RemoteSocketClosed):
+            self.logger.info("Remote socket closed %s" % str(connection.target_address))
             with self.blocking_requests_lock:
                 for blocking_request in self.blocking_requests.values():
                     blocking_request.notify(data.target_address)
@@ -137,8 +143,6 @@ class MessageBus(object):
                     blocking_request.notify(connection.target_address)
         if isinstance(data, PrintRequest):
             self.logger.info("Received print message: %s" % data.message)
-        if self.request_callback is not None:
-            self.request_callback(data)
 
 
 class ClientMessageBus(MessageBus):
@@ -186,30 +190,33 @@ class HostMessageBus(MessageBus):
     def stop(self):
         super().stop()
 
-        # Since the accept method is blocking - we need to establish a bogus connection to ourselves to unblock
-        # the method call.  Since the superclass' call to stop() will set the shutting_down flag, this will effectively
-        # kill the listener thread.
-        close_listener_target = ('localhost', self.listener_address[1])
-        close_listener_connection = self._new_connection(target_address=close_listener_target, blocking=False)
-        close_listener_connection.close()
-
         try:
-            # For reasons that escape me, the listener_socket doesn't shutdown.
-            # Calls to close it result in it being closed - so we wrap it in an Exception here.
-            self.listener_socket.shutdown(socket.SHUT_RDWR)
+            self.listener_socket.shutdown(socket.SHUT_WR)
         except OSError as e:
-            # If this fails, there's nothing we can do.
-            pass
+            if e.errno == 57:
+                pass
+            else:
+                raise e
         self.listener_socket.close()
         self.listener_thread.join()
         self.startup_lock.clear()
+
+    def _can_accept(self):
+        try:
+            inputs, _, closed = select.select([self.listener_socket], [], [self.listener_socket], 0.1)
+        except OSError:
+            inputs = []
+            closed = [self.listener_socket]
+        if len(closed) > 0:
+            self.shutting_down = True
+        return len(inputs) > 0 and not self.shutting_down
 
     def _listen(self):
         self.startup_lock.set()
 
         while not self.shutting_down:
-            (client_socket, client_address) = self.listener_socket.accept()
-            if not self.shutting_down:
+            if self._can_accept():
+                (client_socket, client_address) = self.listener_socket.accept()
                 self._new_connection(target_socket=client_socket)
 
 
@@ -326,14 +333,14 @@ class Connection(object):
 
                 # If data is None, this means that the socket was closed
                 if not data:
-                    return SocketClosed(self.target_address)
+                    return RemoteSocketClosed(self.target_address)
 
                 data = pickle.loads(data)
                 return data
             except Exception as e:
-                return SocketClosed(self.target_address)
+                return RemoteSocketClosed(self.target_address)
         # Finally, if we're shutting down, there's no point in reading - just return a SocketClosed object
-        return SocketClosed(self.target_address)
+        return RemoteSocketClosed(self.target_address)
 
     def _process_data(self, data):
         """
@@ -353,7 +360,7 @@ class Connection(object):
             except Exception as e:
                 if isinstance(data, BaseRequest):
                     response = RequestFail(data.id, str(e))
-        if isinstance(data, SocketClosed):
+        if isinstance(data, RemoteSocketClosed):
             self.shutting_down = True
         if response:
             self.send(response)
@@ -410,8 +417,12 @@ class BlockingRequest(object):
         if len(self.connections) > 0:
             self.event.wait()
 
-    def notify(self, target_address):
-        if target_address in self.connections:
-            self.connections.remove(target_address)
-            if len(self.connections) == 0:
-                self.event.set()
+    def notify(self, target_address=None):
+        if target_address is not None:
+            if target_address in self.connections:
+                self.connections.remove(target_address)
+                if len(self.connections) == 0:
+                    self.event.set()
+        else:
+            self.connections = {}
+            self.event.set()

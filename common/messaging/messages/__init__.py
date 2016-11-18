@@ -51,7 +51,7 @@ class SocketReceiveTimeout(BaseStatus):
         super().__init__()
 
 
-class SocketClosed(BaseStatus):
+class RemoteSocketClosed(BaseStatus):
     def __init__(self, target_address):
         super().__init__()
         self.target_address = target_address

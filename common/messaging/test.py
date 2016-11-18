@@ -1,16 +1,17 @@
 import unittest
-from .message_bus import HostMessageBus, ClientMessageBus
-from .messages import *
-
+from . import *
+from ..app_logging import create_logger
 
 class TestMessageBus(unittest.TestCase):
     def setUp(self):
+        self.logger = create_logger("message_bus_test")
         self.host = InstrumentedHostMessageBus("host")
         self.clients = []
         for num in range(0, 4):
             self.clients.append(InstrumentedClientMessageBus("client%d" % num))
 
     def tearDown(self):
+        self.logger.info("Tearing down")
         self.host.stop()
         for client in self.clients:
             client.stop()
@@ -36,6 +37,7 @@ class TestMessageBus(unittest.TestCase):
         host_transactions = 0
         client_transactions = dict((client, 0) for client in self.clients)
         for client in self.clients:
+            self.logger.info("Connecting %s to host" % client.owner_id)
             self.assertEquals(client.num_received(), client_transactions[client])
             client.start(self.host.listener_address)
             host_transactions += data_per_initiation
@@ -75,6 +77,7 @@ class InstrumentedClientMessageBus(ClientMessageBus):
         self.received_data = []
 
     def collect(self, data):
+        self.logger.info("Received %s" % data.__class__.__name__)
         self.received_data.append(data)
 
     def num_received(self):
