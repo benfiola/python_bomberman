@@ -2,6 +2,7 @@ import threading
 import socket
 import select
 import pickle
+import queue
 from .messages import *
 from ..app_logging import create_logger
 
@@ -26,6 +27,7 @@ class MessageBus(object):
         self.connections_lock = threading.Lock()
         self.connections_by_id = {}
         self.connections_by_target_address = {}
+        self.connection_identification_locks = {}
         self.blocking_requests_lock = threading.Lock()
         self.blocking_requests = {}
         self.shutting_down = False
@@ -82,12 +84,18 @@ class MessageBus(object):
             connection = Connection(owner_name=self.owner_id, request_callback=self._process_data, target_socket=target_socket)
         else:
             connection = Connection(owner_name=self.owner_id, request_callback=self._process_data, target_address=target_address)
+
+        remote_identification_lock = threading.Event()
+
         with self.connections_lock:
+            self.connection_identification_locks[connection.target_address] = remote_identification_lock
             self.connections_by_target_address[connection.target_address] = connection
         self.logger.debug("Accepted connection with %s" % str(connection.target_address))
 
         connection.start()
         self.send(IdentifyRequest(self.owner_id, connection.source_address), target_address=connection.target_address, blocking=blocking)
+        remote_identification_lock.wait()
+        self.connection_identification_locks.pop(connection.target_address)
         return connection
 
     def _identify_connection(self, request):
@@ -103,6 +111,7 @@ class MessageBus(object):
             connection = self.connections_by_target_address[request.target_address]
             connection.id = request.client_id
             self.connections_by_id[connection.id] = connection
+            self.connection_identification_locks[request.target_address].set()
         self.logger.debug("Identified %s:%d as %s" % (connection.target_address[0], connection.target_address[1], connection.id))
 
     def _close_connections(self):
@@ -175,17 +184,13 @@ class HostMessageBus(MessageBus):
         self.listener_address = (socket.gethostname(), 40000)
         self.listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.listener_thread = threading.Thread(name="host-listener-thread", target=self._listen)
-        self.startup_lock = threading.Event()
+        self.listener_thread = WorkerThread(name="host-listener-thread", target=self._listen)
 
     def start(self):
         super().start()
-        self.startup_lock.clear()
-
         self.listener_socket.bind(('', self.listener_address[1]))
         self.listener_socket.listen()
         self.listener_thread.start()
-        self.startup_lock.wait()
 
     def stop(self):
         super().stop()
@@ -193,13 +198,12 @@ class HostMessageBus(MessageBus):
         try:
             self.listener_socket.shutdown(socket.SHUT_WR)
         except OSError as e:
-            if e.errno == 57:
+            if e.errno == 57 or e.errno == 10057:
                 pass
             else:
                 raise e
         self.listener_socket.close()
         self.listener_thread.join()
-        self.startup_lock.clear()
 
     def _can_accept(self):
         try:
@@ -211,8 +215,8 @@ class HostMessageBus(MessageBus):
             self.shutting_down = True
         return len(inputs) > 0 and not self.shutting_down
 
-    def _listen(self):
-        self.startup_lock.set()
+    def _listen(self, startup_lock):
+        startup_lock.set()
 
         while not self.shutting_down:
             if self._can_accept():
@@ -236,12 +240,9 @@ class Connection(object):
         self.shutting_down = False
         self.data_process_callback = request_callback
 
-        self.send_queue = []
-        self.send_queue_lock = threading.Lock()
-        self.send_start_lock = threading.Event()
-        self.send_thread = threading.Thread(name="connection_send_thread", target=self._handle_send)
-        self.receive_start_lock = threading.Event()
-        self.receive_thread = threading.Thread(name="connection_receive_thread", target=self._handle_receive)
+        self.send_queue = queue.Queue()
+        self.send_thread = WorkerThread(name="connection_send_thread", target=self._handle_send)
+        self.receive_thread = WorkerThread(name="connection_receive_thread", target=self._handle_receive)
 
         if target_socket is not None:
             self.socket = target_socket
@@ -254,16 +255,11 @@ class Connection(object):
         self.owner_name = owner_name
 
     def start(self):
-        self.send_start_lock.clear()
-        self.receive_start_lock.clear()
         self.send_thread.start()
         self.receive_thread.start()
-        self.send_start_lock.wait()
-        self.receive_start_lock.wait()
 
     def send(self, message):
-        with self.send_queue_lock:
-            self.send_queue.append(message)
+        self.send_queue.put(message)
 
     def close(self):
         self.shutting_down = True
@@ -274,16 +270,13 @@ class Connection(object):
         self.socket.close()
         self.send_thread.join()
         self.receive_thread.join()
-        self.send_start_lock.clear()
-        self.receive_start_lock.clear()
 
     def _pop_message(self):
-        with self.send_queue_lock:
-            return self.send_queue.pop()
-
-    def _has_messages(self):
-        with self.send_queue_lock:
-            return len(self.send_queue) > 0
+        try:
+            to_return = self.send_queue.get_nowait()
+            return to_return
+        except queue.Empty:
+            return None
 
     def _socket_send(self, message):
         """
@@ -337,8 +330,12 @@ class Connection(object):
 
                 data = pickle.loads(data)
                 return data
-            except Exception as e:
-                return RemoteSocketClosed(self.target_address)
+            except OSError as e:
+                if e.errno == 10054:
+                    return RemoteSocketClosed(self.target_address)
+                else:
+                    self.logger.error(e)
+                    return RemoteSocketClosed(self.target_address)
         # Finally, if we're shutting down, there's no point in reading - just return a SocketClosed object
         return RemoteSocketClosed(self.target_address)
 
@@ -365,16 +362,19 @@ class Connection(object):
         if response:
             self.send(response)
 
-    def _handle_send(self):
-        self.send_start_lock.set()
+    def _handle_send(self, start_lock):
+        start_lock.set()
         while not self.shutting_down:
-            if self._can_write() and self._has_messages():
-                self._socket_send(self._pop_message())
+            if self._can_write():
+                msg = self._pop_message()
+                if msg is not None:
+                    self._socket_send(msg)
 
-    def _handle_receive(self):
-        self.receive_start_lock.set()
+    def _handle_receive(self, start_lock):
         incoming_request_size = 123
         recv_size = incoming_request_size
+
+        start_lock.set()
         while not self.shutting_down:
             if self._can_receive():
                 data = self._socket_receive(size=recv_size)
@@ -426,3 +426,25 @@ class BlockingRequest(object):
         else:
             self.connections = {}
             self.event.set()
+
+
+class WorkerThread(threading.Thread):
+    """
+    A worker thread is generally a routine that runs on a separate thread whose target function generally
+    just polls within a while loop for events until a certain state causes the loop to exit.
+
+    I've found that generally, however, we want to block until the thread actually starts polling and rather
+    than store locks everywhere, we can just wrap this functionality within a subclass of a Thread, and mandate
+    that all targeted routines of a WorkerThread properly set the threading.Event when it has begun polling.
+    """
+    def __init__(self, *args, **kwargs):
+        self.start_lock = threading.Event()
+        args = ()
+        if "args" in kwargs:
+            args = kwargs["args"]
+        kwargs["args"] = args + (self.start_lock, )
+        super().__init__(*args, **kwargs)
+
+    def start(self):
+        super().start()
+        self.start_lock.wait()
