@@ -13,9 +13,9 @@ class TestMessageBus(unittest.TestCase):
 
     def tearDown(self):
         self.logger.info("Tearing down")
-        self.host.stop()
         for client in self.clients:
             client.stop()
+        self.host.stop()
         self.clients = []
         self.host = None
 
