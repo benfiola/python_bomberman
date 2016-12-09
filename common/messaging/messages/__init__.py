@@ -4,11 +4,13 @@ import uuid
 class BaseMessage(object):
     def __init__(self):
         self.id = str(uuid.uuid4())
+        self.requires_response = False
 
 
 class BaseRequest(BaseMessage):
     def __init__(self):
         super().__init__()
+        self.requires_response = True
 
 
 class PrintRequest(BaseRequest):
@@ -31,30 +33,14 @@ class BaseResponse(BaseMessage):
 
 
 class RequestFail(BaseResponse):
-    def __init__(self, request_id, message):
+    def __init__(self, request_id, error):
         super().__init__(request_id)
-        self.message = message
+        self.error = error
 
 
 class RequestSuccess(BaseResponse):
     def __init__(self, request_id):
         super().__init__(request_id)
-
-
-class BaseStatus(BaseMessage):
-    def __init__(self):
-        super().__init__()
-
-
-class SocketReceiveTimeout(BaseStatus):
-    def __init__(self):
-        super().__init__()
-
-
-class RemoteSocketClosed(BaseStatus):
-    def __init__(self, target_address):
-        super().__init__()
-        self.target_address = target_address
 
 
 class IncomingRequest(BaseMessage):

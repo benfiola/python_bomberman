@@ -1,6 +1,6 @@
 import logging
 
-FORMAT = "[%(asctime)s:%(msecs)03d] [%(levelname)s] [%(threadName)s:%(name)s] %(msg)s"
+FORMAT = "[%(asctime)s:%(msecs)03d] [%(levelname)s] [%(name)s:%(threadName)s] %(msg)s"
 DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
 formatter = logging.Formatter(FORMAT, datefmt=DATE_FORMAT)
 
