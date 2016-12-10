@@ -3,21 +3,23 @@ import socket
 import select
 import pickle
 import queue
+import sys
+from uuid import uuid4 as generate_uuid
 from .messages import *
 from ..app_logging import create_logger
 
 
 class MessageBus(object):
-    def __init__(self, owner_id, request_callback):
+    def __init__(self, bus_uuid, request_callback):
         """
         A message bus facilitates communication between two different machines.
 
-        :param owner_id: the UUID of the class that spawned this - connections are tagged by UUID.
+        :param uuid: the UUID of the class that spawned this - connections are tagged by UUID.
         :param request_callback: a callback to process messages outside of the message bus.
         """
         self.logger = create_logger("message-bus")
         self.request_callback = request_callback
-        self.owner_id = owner_id
+        self.uuid = bus_uuid
 
         self.connections_lock = threading.Lock()
         self.connections_by_id = {}
@@ -27,6 +29,10 @@ class MessageBus(object):
         self.blocking_requests_lock = threading.Lock()
         self.blocking_requests = {}
         self.shutting_down = False
+
+        self.data_handlers = {}
+        self.register_data_handler(IdentifyRequest, self._identify_connection)
+        self.register_data_handler(BaseResponse, self._on_response_received)
 
     def start(self, *args, **kwargs):
         pass
@@ -71,6 +77,42 @@ class MessageBus(object):
             self.connections_by_target_address = {}
             self.connections_by_id = {}
 
+    def data_handler(self, cls):
+        """
+        Decorator function for register_data_handler.
+
+        Will register this function with all subclasses of a message type
+        if a superclass is specified.
+
+        @bus.data_handler(<message class name>)
+
+        :param cls: Class of the Message object this method will handle.
+        :return:
+        """
+        def decorated(func):
+            self.register_data_handler(cls, func)
+        return decorated
+
+    def register_data_handler(self, cls, func):
+        """
+        Registers a function to handle a particular message class type.
+
+        Will register this function with all subclasses of a message type
+        if a superclass is specified.
+
+        :param cls: Class of the Message object this method will handle.
+        :param func:  Data handler function
+        :return:
+        """
+        to_register = [cls]
+        while to_register:
+            curr_cls = to_register.pop()
+            for subcls in curr_cls.__subclasses__():
+                to_register.append(subcls)
+            if curr_cls not in self.data_handlers:
+                self.data_handlers[curr_cls] = []
+            self.data_handlers[curr_cls].append(func)
+
     def _on_connection_close(self, connection):
         """
         This is called when a connection is closed unexpectedly.  When the connection detects that the socket has been
@@ -86,8 +128,8 @@ class MessageBus(object):
         with self.connections_lock:
             if connection.target_address in self.connections_by_target_address:
                 self.connections_by_target_address.pop(connection.target_address)
-            if connection.id in self.connections_by_id:
-                self.connections_by_id.pop(connection.id)
+            if connection.remote_uuid in self.connections_by_id:
+                self.connections_by_id.pop(connection.remote_uuid)
 
     def _new_connection(self, target_address=None, target_socket=None):
         """
@@ -100,9 +142,9 @@ class MessageBus(object):
         :return: a Connection object.
         """
         if target_socket:
-            connection = Connection(self.owner_id, self._process_data, self._on_connection_close, target_socket=target_socket)
+            connection = Connection(self.uuid, self._process_data, self._on_connection_close, target_socket=target_socket)
         else:
-            connection = Connection(self.owner_id, self._process_data, self._on_connection_close, target_address=target_address)
+            connection = Connection(self.uuid, self._process_data, self._on_connection_close, target_address=target_address)
 
         with self.connections_lock:
             self.connection_identification_locks[connection.target_address] = threading.Event()
@@ -110,7 +152,7 @@ class MessageBus(object):
         self.logger.debug("Accepted connection with %s" % str(connection.target_address))
 
         connection.start()
-        self.send(IdentifyRequest(self.owner_id, connection.source_address), target_address=connection.target_address)
+        self.send(IdentifyRequest(self.uuid, connection.source_address), target_address=connection.target_address)
         self.connection_identification_locks.get(connection.target_address).wait()
         return connection
 
@@ -124,10 +166,10 @@ class MessageBus(object):
             raise ClientNotFoundException(client_target_address=request.target_address)
 
         with self.connections_lock:
-            connection.id = request.client_id
-            self.connections_by_id[connection.id] = connection
+            connection.remote_uuid = request.client_id
+            self.connections_by_id[connection.remote_uuid] = connection
             self.connection_identification_locks[connection.target_address].set()
-        self.logger.debug("Identified %s:%d as %s" % (connection.target_address[0], connection.target_address[1], connection.id))
+        self.logger.debug("Identified %s:%d as %s" % (connection.target_address[0], connection.target_address[1], connection.remote_uuid))
 
     def _on_response_received(self, data, connection):
         if hasattr(data, "error"):
@@ -140,21 +182,23 @@ class MessageBus(object):
     def _process_data(self, data, connection):
         if self.request_callback is not None:
             self.request_callback(data)
-        if isinstance(data, IdentifyRequest):
-            self._identify_connection(data, connection)
-        if isinstance(data, BaseResponse):
-            self._on_response_received(data, connection)
-        if isinstance(data, PrintRequest):
-            self.logger.info("Received print message: %s" % data.message)
+        if data.__class__ in self.data_handlers:
+            for handler in self.data_handlers[data.__class__]:
+                # Internal check - if so, provide data and connection arguments.
+                # If external, just provide data arguments.
+                if hasattr(handler, "__self__") and isinstance(handler.__self__, MessageBus):
+                    handler(data, connection)
+                else:
+                    handler(data)
 
 
 class ClientMessageBus(MessageBus):
-    def __init__(self, owner_id, request_callback=None):
+    def __init__(self, request_callback=None, uuid=generate_uuid()):
         """
         A Client message bus has a target host in mind when first created.  Then, it simply connects to this host
         when the start method is called
         """
-        super().__init__(owner_id, request_callback)
+        super().__init__(uuid, request_callback)
         self.host_address = None
 
     def start(self, host_address):
@@ -167,11 +211,11 @@ class ClientMessageBus(MessageBus):
 
 
 class HostMessageBus(MessageBus):
-    def __init__(self, owner_id, request_callback=None):
+    def __init__(self, request_callback, uuid=generate_uuid()):
         """
         A Host message bus is a standard message bus with an additional socket used to listen for new connections.
         """
-        super().__init__(owner_id, request_callback)
+        super().__init__(uuid, request_callback)
         self.listener_address = (socket.gethostname(), 40000)
         self.listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -209,7 +253,7 @@ class HostMessageBus(MessageBus):
 
 
 class Connection(object):
-    def __init__(self, owner_name, request_callback, connection_close_callback, target_address=None, target_socket=None):
+    def __init__(self, local_uuid, request_callback, connection_close_callback, target_address=None, target_socket=None):
         """
         A connection is a wrapper over the typical socket objects that facilitate machine to machine communication.
 
@@ -220,15 +264,15 @@ class Connection(object):
         :param target_address: The address to connect a new socket to.
         :param target_socket: The socket to use in lieu of creating a new socket.
         """
-        self.logger = create_logger("%s-connection" % owner_name)
-        self.id = None
+        self.logger = create_logger("%s-connection" % local_uuid)
+        self.remote_uuid = None
         self.shutting_down = False
         self.data_process_callback = request_callback
         self.connection_close_callback = connection_close_callback
 
         self.send_queue = queue.Queue()
-        self.send_thread = WorkerThread(name="%s-connection_send_thread" % owner_name, target=self._handle_send)
-        self.receive_thread = WorkerThread(name="%s-connection_receive_thread" % owner_name, target=self._handle_receive)
+        self.send_thread = WorkerThread(name="%s-connection_send_thread" % local_uuid, target=self._handle_send)
+        self.receive_thread = WorkerThread(name="%s-connection_receive_thread" % local_uuid, target=self._handle_receive)
 
         if target_socket is not None:
             self.socket = target_socket
@@ -238,7 +282,7 @@ class Connection(object):
 
         self.source_address = self.socket.getsockname()
         self.target_address = self.socket.getpeername()
-        self.owner_name = owner_name
+        self.local_uuid = local_uuid
 
     def start(self):
         self.send_thread.start()
@@ -278,7 +322,7 @@ class Connection(object):
         def close():
             self.close()
             self.connection_close_callback(self)
-        threading.Thread(name="%s-close_connection" % self.owner_name, target=close).start()
+        threading.Thread(name="%s-close_connection" % self.local_uuid, target=close).start()
 
     def _pop_message(self):
         try:
@@ -330,6 +374,7 @@ class Connection(object):
         try:
             self.data_process_callback(data, self)
         except Exception as e:
+            self.logger.error(str(e))
             response = RequestFail(data.id, str(e))
         if data.requires_response:
             self.send(response)
@@ -353,7 +398,10 @@ class Connection(object):
         :param start_lock: An attribute of a WorkerThread, will block the creating thread until this lock is set.
         :return:
         """
-        incoming_request_size = len(pickle.dumps(IncomingRequest(0)))
+        incoming_request = IncomingRequest(sys.maxsize)
+        pickled = pickle.dumps(incoming_request)
+        unpickled = pickle.loads(pickled)
+        incoming_request_size = len(pickle.dumps(IncomingRequest(sys.maxsize)))
         recv_size = incoming_request_size
 
         start_lock.set()

@@ -30,7 +30,7 @@ class TestMessageBus(unittest.TestCase):
         host_transactions = 0
         client_transactions = dict((client, 0) for client in self.clients)
         for client in self.clients:
-            self.logger.info("Connecting %s to host" % client.owner_id)
+            self.logger.info("Connecting %s to host" % client.uuid)
             self.assertEquals(client.num_received(), client_transactions[client])
             client.start(self.host.listener_address)
             host_transactions += 1
@@ -57,13 +57,13 @@ class TestMessageBus(unittest.TestCase):
 
 
 class InstrumentedClientMessageBus(ClientMessageBus):
-    def __init__(self, owner_id):
-        super().__init__(owner_id, request_callback=self.collect)
+    def __init__(self, uuid):
+        super().__init__(self.collect, uuid=uuid)
         self.received_data = []
 
     def collect(self, data):
         if isinstance(data, RequestFail):
-            raise Exception("Request failed with message: %s" % data.message)
+            raise Exception("Request failed with message: %s" % data.error)
         elif not isinstance(data, BaseResponse):
             self.received_data.append(data)
 
@@ -72,13 +72,13 @@ class InstrumentedClientMessageBus(ClientMessageBus):
 
 
 class InstrumentedHostMessageBus(HostMessageBus):
-    def __init__(self, owner_id):
-        super().__init__(owner_id, request_callback=self.collect)
+    def __init__(self, uuid):
+        super().__init__(self.collect, uuid=uuid)
         self.received_data = []
 
     def collect(self, data):
         if isinstance(data, RequestFail):
-            raise Exception("Request failed with message: %s" % data.message)
+            raise Exception("Request failed with message: %s" % data.error)
         elif not isinstance(data, BaseResponse):
             self.received_data.append(data)
 
