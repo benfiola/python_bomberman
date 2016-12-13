@@ -1,2 +1,2 @@
 from .app_logging import logger
-from .messaging import ClientMessageBus, HostMessageBus, messages
+from .messaging import ClientNetworkedMessageBus, HostNetworkedMessageBus, messages

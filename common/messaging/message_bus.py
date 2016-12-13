@@ -3,36 +3,57 @@ import socket
 import select
 import pickle
 import queue
-import sys
-from uuid import uuid4 as generate_uuid
 from .messages import *
 from ..app_logging import create_logger
 
 
 class MessageBus(object):
-    def __init__(self, bus_uuid, request_callback):
+    def __init__(self, bus_uuid):
+        self.uuid = bus_uuid
+        self.logger = create_logger("message-bus")
+        self.data_handlers = {}
+
+    def start(self):
+        pass
+
+    def send(self, message):
+        pass
+
+    def stop(self):
+        pass
+
+    def data_handler(self, cls):
+        def decorated(func):
+            self.register_data_handler(cls, func)
+        return decorated
+
+    def register_data_handler(self, cls, func):
+        to_register = [cls]
+        while to_register:
+            curr_cls = to_register.pop()
+            for subcls in curr_cls.__subclasses__():
+                to_register.append(subcls)
+            if curr_cls not in self.data_handlers:
+                self.data_handlers[curr_cls] = []
+            self.data_handlers[curr_cls].append(func)
+
+
+class NetworkedMessageBus(MessageBus):
+    def __init__(self, bus_uuid):
         """
-        A message bus facilitates communication between two different machines.
+        A message bus facilitates communication between two networked machines.
 
         :param uuid: the UUID of the class that spawned this - connections are tagged by UUID.
         :param request_callback: a callback to process messages outside of the message bus.
         """
-        self.logger = create_logger("message-bus")
-        self.request_callback = request_callback
-        self.uuid = bus_uuid
+        super().__init__(bus_uuid)
 
-        self.connections_lock = threading.Lock()
-        self.connections_by_id = {}
-        self.connections_by_target_address = {}
-
-        self.connection_identification_locks = {}
-        self.blocking_requests_lock = threading.Lock()
-        self.blocking_requests = {}
+        self.connection_manager = ConnectionManager(self)
+        self.request_manager = RequestManager(self)
         self.shutting_down = False
 
-        self.data_handlers = {}
-        self.register_data_handler(IdentifyRequest, self._identify_connection)
-        self.register_data_handler(BaseResponse, self._on_response_received)
+        self.register_data_handler(IdentifyRequest, self.connection_manager.identify)
+        self.register_data_handler(BaseResponse, self.request_manager.on_response)
 
     def start(self, *args, **kwargs):
         pass
@@ -46,176 +67,58 @@ class MessageBus(object):
         :param blocking: Allows the function to block until all responses are received.
         :return:
         """
-        with self.connections_lock:
-            connections = self.connections_by_id.values()
-            if target_address and target_address in self.connections_by_target_address:
-                connections = [self.connections_by_target_address[target_address]]
-            elif target_address:
-                raise ClientNotFoundException(client_target_address=target_address)
-
-        if blocking:
-            with self.blocking_requests_lock:
-                self.blocking_requests[message.id] = BlockingRequest(connections)
-
-        for connection in connections:
-            connection.send(message)
-
-        if blocking:
-            self.blocking_requests[message.id].wait()
+        connections = self.connection_manager.get(target_address)
+        self.request_manager.send(message, connections, blocking)
 
     def stop(self):
         self.shutting_down = True
+        connections = self.connection_manager.get()
+        for connection in connections:
+            self.request_manager.notify(connection)
+            self.connection_manager.close(connection)
 
-        with self.blocking_requests_lock:
-            for blocking_request in self.blocking_requests.values():
-                blocking_request.notify()
-            self.blocking_requests = {}
+    def handle_closed_remote_socket(self, connection):
+        self.request_manager.notify(connection)
+        self.connection_manager.close(connection)
 
-        with self.connections_lock:
-            for connection in list(self.connections_by_target_address.values()):
-                connection.close()
-            self.connections_by_target_address = {}
-            self.connections_by_id = {}
-
-    def data_handler(self, cls):
-        """
-        Decorator function for register_data_handler.
-
-        Will register this function with all subclasses of a message type
-        if a superclass is specified.
-
-        @bus.data_handler(<message class name>)
-
-        :param cls: Class of the Message object this method will handle.
-        :return:
-        """
-        def decorated(func):
-            self.register_data_handler(cls, func)
-        return decorated
-
-    def register_data_handler(self, cls, func):
-        """
-        Registers a function to handle a particular message class type.
-
-        Will register this function with all subclasses of a message type
-        if a superclass is specified.
-
-        :param cls: Class of the Message object this method will handle.
-        :param func:  Data handler function
-        :return:
-        """
-        to_register = [cls]
-        while to_register:
-            curr_cls = to_register.pop()
-            for subcls in curr_cls.__subclasses__():
-                to_register.append(subcls)
-            if curr_cls not in self.data_handlers:
-                self.data_handlers[curr_cls] = []
-            self.data_handlers[curr_cls].append(func)
-
-    def _on_connection_close(self, connection):
-        """
-        This is called when a connection is closed unexpectedly.  When the connection detects that the socket has been
-        closed remotely, it will clean itself up and then call this function so that the bus can clean up any things
-        that refer to this connection.
-        :param connection:
-        :return:
-        """
-        with self.blocking_requests_lock:
-            for blocking_request in self.blocking_requests.values():
-                blocking_request.notify(connection.target_address)
-
-        with self.connections_lock:
-            if connection.target_address in self.connections_by_target_address:
-                self.connections_by_target_address.pop(connection.target_address)
-            if connection.remote_uuid in self.connections_by_id:
-                self.connections_by_id.pop(connection.remote_uuid)
-
-    def _new_connection(self, target_address=None, target_socket=None):
-        """
-        Creates a new Connection between this machine and a target machine.
-
-        Connects, sends an identify request, and blocks until both machines handshake.
-
-        :param target_address: specifies a target to connect a new socket to
-        :param target_socket: use this pre-existing socket
-        :return: a Connection object.
-        """
-        if target_socket:
-            connection = Connection(self.uuid, self._process_data, self._on_connection_close, target_socket=target_socket)
-        else:
-            connection = Connection(self.uuid, self._process_data, self._on_connection_close, target_address=target_address)
-
-        with self.connections_lock:
-            self.connection_identification_locks[connection.target_address] = threading.Event()
-            self.connections_by_target_address[connection.target_address] = connection
-        self.logger.debug("Accepted connection with %s" % str(connection.target_address))
-
-        connection.start()
-        self.send(IdentifyRequest(self.uuid, connection.source_address), target_address=connection.target_address)
-        self.connection_identification_locks.get(connection.target_address).wait()
-        return connection
-
-    def _identify_connection(self, request, connection):
-        """
-        Identifies a connection as belonging to a particular UUID.
-        :param request: The received IdentifyRequest
-        :return:
-        """
-        if connection.target_address not in self.connections_by_target_address:
-            raise ClientNotFoundException(client_target_address=request.target_address)
-
-        with self.connections_lock:
-            connection.remote_uuid = request.client_id
-            self.connections_by_id[connection.remote_uuid] = connection
-            self.connection_identification_locks[connection.target_address].set()
-        self.logger.debug("Identified %s:%d as %s" % (connection.target_address[0], connection.target_address[1], connection.remote_uuid))
-
-    def _on_response_received(self, data, connection):
-        if hasattr(data, "error"):
-            self.logger.error("Request failed from %s : %s" % (str(connection.target_address), str(data.error)))
-        with self.blocking_requests_lock:
-            if data.request_id in self.blocking_requests:
-                blocking_request = self.blocking_requests[data.request_id]
-                blocking_request.notify(connection.target_address)
-
-    def _process_data(self, data, connection):
-        if self.request_callback is not None:
-            self.request_callback(data)
+    def handle_data(self, data, connection):
         if data.__class__ in self.data_handlers:
             for handler in self.data_handlers[data.__class__]:
-                # Internal check - if so, provide data and connection arguments.
-                # If external, just provide data arguments.
-                if hasattr(handler, "__self__") and isinstance(handler.__self__, MessageBus):
+                # if it's internal, we probably care about the connection
+                # if it's an external data handler, all that matters is the data argument
+                # let's enforce this here.
+                if hasattr(handler, '__self__') and isinstance(handler.__self__, (ConnectionManager, RequestManager, MessageBus)):
                     handler(data, connection)
                 else:
                     handler(data)
 
 
-class ClientMessageBus(MessageBus):
-    def __init__(self, request_callback=None, uuid=generate_uuid()):
+class ClientNetworkedMessageBus(NetworkedMessageBus):
+    def __init__(self, bus_uuid):
         """
         A Client message bus has a target host in mind when first created.  Then, it simply connects to this host
         when the start method is called
         """
-        super().__init__(uuid, request_callback)
+        super().__init__(bus_uuid)
         self.host_address = None
 
     def start(self, host_address):
         super().start()
         self.host_address = host_address
-        self._new_connection(target_address=self.host_address)
+        connection = self.connection_manager.open(target_address=self.host_address)
+        self.request_manager.send(IdentifyRequest(self.uuid, connection.source_address), connections=[connection])
+        self.connection_manager.wait_until_handshake(connection)
 
     def stop(self):
         super().stop()
 
 
-class HostMessageBus(MessageBus):
-    def __init__(self, request_callback, uuid=generate_uuid()):
+class HostNetworkedMessageBus(NetworkedMessageBus):
+    def __init__(self, bus_uuid):
         """
         A Host message bus is a standard message bus with an additional socket used to listen for new connections.
         """
-        super().__init__(uuid, request_callback)
+        super().__init__(bus_uuid)
         self.listener_address = (socket.gethostname(), 40000)
         self.listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -243,17 +146,18 @@ class HostMessageBus(MessageBus):
         startup_lock.set()
 
         while not self.shutting_down:
-            if SocketUtils.can_read(self.listener_socket, self._on_listener_socket_close):
+            if self.listener_socket.can_read(self._on_listener_socket_close):
                 try:
                     (client_socket, client_address) = self.listener_socket.accept()
-                    self._new_connection(target_socket=client_socket)
+                    connection = self.connection_manager.open(target_socket=client_socket)
+                    self.request_manager.send(IdentifyRequest(self.uuid, connection.source_address), connections=[connection])
+                    self.connection_manager.wait_until_handshake(connection)
                 except OSError:
                     self._on_listener_socket_close()
 
 
-
 class Connection(object):
-    def __init__(self, local_uuid, request_callback, connection_close_callback, target_address=None, target_socket=None):
+    def __init__(self, bus, target_address=None, target_socket=None):
         """
         A connection is a wrapper over the typical socket objects that facilitate machine to machine communication.
 
@@ -264,15 +168,16 @@ class Connection(object):
         :param target_address: The address to connect a new socket to.
         :param target_socket: The socket to use in lieu of creating a new socket.
         """
-        self.logger = create_logger("%s-connection" % local_uuid)
+        self.logger = create_logger("%s-connection" % bus.uuid)
+        self.local_uuid = bus.uuid
         self.remote_uuid = None
         self.shutting_down = False
-        self.data_process_callback = request_callback
-        self.connection_close_callback = connection_close_callback
+        self.data_process_callback = bus.handle_data
+        self.connection_close_callback = bus.handle_closed_remote_socket
 
         self.send_queue = queue.Queue()
-        self.send_thread = WorkerThread(name="%s-connection_send_thread" % local_uuid, target=self._handle_send)
-        self.receive_thread = WorkerThread(name="%s-connection_receive_thread" % local_uuid, target=self._handle_receive)
+        self.send_thread = WorkerThread(name="%s-connection_send_thread" % self.local_uuid, target=self._handle_send)
+        self.receive_thread = WorkerThread(name="%s-connection_receive_thread" % self.local_uuid, target=self._handle_receive)
 
         if target_socket is not None:
             self.socket = target_socket
@@ -282,7 +187,6 @@ class Connection(object):
 
         self.source_address = self.socket.getsockname()
         self.target_address = self.socket.getpeername()
-        self.local_uuid = local_uuid
 
     def start(self):
         self.send_thread.start()
@@ -370,12 +274,12 @@ class Connection(object):
         return None
 
     def _process_data(self, data):
-        response = RequestSuccess(data.id)
+        response = RequestSuccess(data.uuid)
         try:
             self.data_process_callback(data, self)
         except Exception as e:
             self.logger.error(str(e))
-            response = RequestFail(data.id, str(e))
+            response = RequestFail(data.uuid, str(e))
         if data.requires_response:
             self.send(response)
 
@@ -387,7 +291,7 @@ class Connection(object):
         """
         start_lock.set()
         while not self.shutting_down:
-            if SocketUtils.can_write(self.socket, self._on_socket_close):
+            if self.socket.can_write(self._on_socket_close):
                 msg = self._pop_message()
                 if msg is not None:
                     self._socket_send(msg)
@@ -398,15 +302,12 @@ class Connection(object):
         :param start_lock: An attribute of a WorkerThread, will block the creating thread until this lock is set.
         :return:
         """
-        incoming_request = IncomingRequest(sys.maxsize)
-        pickled = pickle.dumps(incoming_request)
-        unpickled = pickle.loads(pickled)
-        incoming_request_size = len(pickle.dumps(IncomingRequest(sys.maxsize)))
+        incoming_request_size = len(pickle.dumps(IncomingRequest(0)))
         recv_size = incoming_request_size
 
         start_lock.set()
         while not self.shutting_down:
-            if SocketUtils.can_read(self.socket, self._on_socket_close):
+            if self.socket.can_read(self._on_socket_close):
                 data = self._socket_receive(size=recv_size)
                 if data is not None:
                     if isinstance(data, IncomingRequest):
@@ -416,32 +317,167 @@ class Connection(object):
                         recv_size = incoming_request_size
 
 
-class BlockingRequest(object):
+class Request(object):
     """
-    Container to manage blocking requests.
-    Holds a lock as well as a list of connections that a request is being sent to.
+    This object contains a message and all the connections its been sent to.
+
+    It has the ability to block until all recipients acknowledge receipt.
 
     Upon receipt of a response from these connections OR
     if the socket used in the connetion is closed, will
     check upon pending connection responses and unblock as necessary.
     """
-    def __init__(self, connections):
-        self.event = threading.Event()
-        self.connections = {connection.target_address for connection in connections}
+    def __init__(self, message, connections, blocking):
+        self.message = message
+        self.event = None
+        if blocking:
+            self.event = threading.Event()
+        self.connections = dict((connection, 1) for connection in connections)
 
-    def wait(self):
+    def send(self):
         if len(self.connections) > 0:
-            self.event.wait()
+            for connection in self.connections.keys():
+                connection.send(self.message)
+            if self.event:
+                self.event.wait()
 
-    def notify(self, target_address=None):
-        if target_address is not None:
-            if target_address in self.connections:
-                self.connections.remove(target_address)
-                if len(self.connections) == 0:
-                    self.event.set()
-        else:
+    def notify(self, connection):
+        if connection is None:
             self.connections = {}
+        else:
+            if connection in self.connections:
+                self.connections.pop(connection)
+        if len(self.connections) == 0 and self.event:
             self.event.set()
+
+
+class RequestManager(object):
+    """
+    A request manager simply handles all 'requests' as issued from
+    a message bus.  This way, we can keep all the request blocking behavior
+    and memoization of pending requests separate from the message bus, which
+    kinda cluttered the code.
+    """
+    def __init__(self, bus):
+        self.logger = create_logger("request-manager")
+        self.bus = bus
+
+        self.pending_requests_lock = threading.Lock()
+        self.pending_requests = {}
+
+    def send(self, message, connections, blocking=True):
+        request = Request(message, connections, blocking)
+        with self.pending_requests_lock:
+            if request.message.uuid in self.pending_requests:
+                raise Exception("Resending a pending request?")
+            self.pending_requests[request.message.uuid] = request
+            request.send()
+
+    def notify(self, connection, request=None):
+        """
+        Delegates to the request's notify function, but
+        will also clear the pending_requests dictionary
+        if a request has no more pending connection responses.
+        :param connection:
+        :param request:
+        :return:
+        """
+        if request is None:
+            requests = list(self.pending_requests.values())
+        else:
+            requests = [request]
+        for request in requests:
+            request.notify(connection)
+            if len(request.connections) == 0:
+                self.pending_requests.pop(request.message.uuid)
+
+    def on_response(self, data, connection):
+        """
+        Convenience method for plugging into the message_bus data handling
+        system.
+        :param data:
+        :param connection:
+        :return:
+        """
+        if data.request_id in self.pending_requests:
+            request = self.pending_requests[data.request_id]
+            self.notify(connection, request)
+
+
+class ConnectionManager(object):
+    """
+    A connection manager simply handles connections between two machines.
+    Anything involving memoizing connections and establishing, handshaking
+    and closing a socket connection gets passed through here in an effort
+    to reduce clutter in the message bus.
+    """
+    def __init__(self, bus):
+        self.logger = create_logger("connection-manager")
+        self.bus = bus
+
+        self.connections_lock = threading.Lock()
+        self.connections_by_id = {}
+        self.connections_by_target_address = {}
+
+        self.connection_identification_locks = {}
+        self.blocking_requests_lock = threading.Lock()
+        self.blocking_requests = {}
+
+    def open(self, **kwargs):
+        """
+        Creates a new Connection between this machine and a target machine.
+
+        Connects, sends an identify request, and blocks until both machines handshake.
+
+        :param target_address: specifies a target to connect a new socket to
+        :param target_socket: use this pre-existing socket
+        :return: a Connection object.
+        """
+        connection = Connection(self.bus, **kwargs)
+
+        with self.connections_lock:
+            self.connection_identification_locks[connection.target_address] = threading.Event()
+            self.connections_by_target_address[connection.target_address] = connection
+        self.logger.debug("Accepted connection with %s" % str(connection.target_address))
+
+        connection.start()
+        return connection
+
+    def wait_until_handshake(self, connection):
+        """
+        When a connection is created, we need to send an
+        IdentifyRequest through the RequestManager to initiate
+        a handshake - however, once this is done, we want to wait
+        until we've confirmed that the handshake has succeeded.
+        :param connection:
+        :return:
+        """
+        self.connection_identification_locks[connection.target_address].wait()
+
+    def get(self, target_address=None):
+        with self.connections_lock:
+            if target_address is None:
+                return list(self.connections_by_id.values())
+            else:
+                if target_address not in self.connections_by_target_address:
+                    raise ClientNotFoundException(client_target_address=target_address)
+                return [self.connections_by_target_address[target_address]]
+
+    def close(self, connection):
+        with self.connections_lock:
+            if connection.remote_uuid in self.connections_by_id:
+                self.connections_by_id.pop(connection.remote_uuid)
+            if connection.target_address in self.connections_by_target_address:
+                self.connections_by_target_address.pop(connection.target_address)
+            if not connection.shutting_down:
+                connection.close()
+
+    def identify(self, request, connection):
+        with self.connections_lock:
+            connection.remote_uuid = request.client_id
+            self.connections_by_id[request.uuid] = connection
+            self.connection_identification_locks[connection.target_address].set()
+        self.logger.debug("Identified %s:%d as %s" % (connection.target_address[0], connection.target_address[1], connection.remote_uuid))
 
 
 class WorkerThread(threading.Thread):
@@ -480,31 +516,34 @@ class ClientNotFoundException(ConnectionException):
             message = "Client %s:%d not found." % client_target_address
         super().__init__(message)
 
+# Here, I'm going to monkey patch some 'helpful' methods here onto socket.socket.
+# Basically, when I work with sockets, I use these can_read
+# and can_write helper methods to help determine if it's worthwhile
+# to block on a read/write.  However, since I use sockets in more
+# than one place, it seems 'cleaner' to patch it onto the socket object
+# in lieu of subclassing (which doesn't work with accept) or writing
+# a helper set of static methods that take a socket and a callback
+# as an argument.
+def can_read(self, socket_close_callback):
+    try:
+        inputs, _, closed = select.select([self], [], [self], 0.1)
+    except OSError:
+        inputs = []
+        closed = [self]
+    if len(closed) > 0:
+        socket_close_callback()
+    return len(inputs) > 0 and len(closed) == 0
 
-class SocketUtils(object):
-    """
-    This is a helper class that does basic select calls on a socket to see if it is available to write/read.
-    In the event that a socket has been closed, will invoke the provided socket_close_callback function to handle
-    closed sockets.
-    """
-    @classmethod
-    def can_read(cls, sock, socket_close_callback):
-        try:
-            inputs, _, closed = select.select([sock], [], [sock], 0.1)
-        except OSError:
-            inputs = []
-            closed = [sock]
-        if len(closed) > 0:
-            socket_close_callback()
-        return len(inputs) > 0 and len(closed) == 0
 
-    @classmethod
-    def can_write(cls, sock, socket_close_callback):
-        try:
-            _, outputs, closed = select.select([], [sock], [sock], 0.1)
-        except OSError:
-            outputs = []
-            closed = [sock]
-        if len(closed) > 0:
-            socket_close_callback()
-        return len(outputs) > 0 and len(closed) == 0
+def can_write(self, socket_close_callback):
+    try:
+        _, outputs, closed = select.select([], [self], [self], 0.1)
+    except OSError:
+        outputs = []
+        closed = [self]
+    if len(closed) > 0:
+        socket_close_callback()
+    return len(outputs) > 0 and len(closed) == 0
+
+socket.socket.can_read = can_read
+socket.socket.can_write = can_write

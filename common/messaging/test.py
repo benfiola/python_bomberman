@@ -6,10 +6,8 @@ from ..app_logging import create_logger
 class TestMessageBus(unittest.TestCase):
     def setUp(self):
         self.logger = create_logger("message_bus_test")
-        self.host = InstrumentedHostMessageBus("host")
-        self.clients = []
-        for num in range(0, 4):
-            self.clients.append(InstrumentedClientMessageBus("client%d" % num))
+        self.host = InstrumentedHostMessageBus()
+        self.clients = [InstrumentedClientMessageBus(num) for num in range(0, 4)]
 
     def tearDown(self):
         self.logger.info("Tearing down")
@@ -56,12 +54,14 @@ class TestMessageBus(unittest.TestCase):
             self.assertEquals(self.host.num_received(), host_transactions)
 
 
-class InstrumentedClientMessageBus(ClientMessageBus):
-    def __init__(self, uuid):
-        super().__init__(self.collect, uuid=uuid)
+class InstrumentedClientMessageBus(ClientNetworkedMessageBus):
+    def __init__(self, number):
+        super().__init__("client-%d" % number)
         self.received_data = []
+        self.register_data_handler(BaseMessage, self.collect)
+        self.register_data_handler(PrintRequest, self.print)
 
-    def collect(self, data):
+    def collect(self, data, connection):
         if isinstance(data, RequestFail):
             raise Exception("Request failed with message: %s" % data.error)
         elif not isinstance(data, BaseResponse):
@@ -70,13 +70,18 @@ class InstrumentedClientMessageBus(ClientMessageBus):
     def num_received(self):
         return len(self.received_data)
 
+    def print(self, data, connection):
+        self.logger.info("%s received message: %s" % (self.uuid, self.data.message))
 
-class InstrumentedHostMessageBus(HostMessageBus):
-    def __init__(self, uuid):
-        super().__init__(self.collect, uuid=uuid)
+
+class InstrumentedHostMessageBus(HostNetworkedMessageBus):
+    def __init__(self):
+        super().__init__("host")
         self.received_data = []
+        self.register_data_handler(BaseMessage, self.collect)
+        self.register_data_handler(PrintRequest, self.print)
 
-    def collect(self, data):
+    def collect(self, data, connection):
         if isinstance(data, RequestFail):
             raise Exception("Request failed with message: %s" % data.error)
         elif not isinstance(data, BaseResponse):
@@ -84,3 +89,6 @@ class InstrumentedHostMessageBus(HostMessageBus):
 
     def num_received(self):
         return len(self.received_data)
+
+    def print(self, data, connection):
+        self.logger.info("%s received message: %s" % (self.uuid, data.message))

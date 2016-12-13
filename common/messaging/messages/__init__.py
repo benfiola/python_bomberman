@@ -4,7 +4,7 @@ import struct
 
 class BaseMessage(object):
     def __init__(self):
-        self.id = str(uuid.uuid4())
+        self.uuid = str(uuid.uuid4())
         self.requires_response = False
 
 

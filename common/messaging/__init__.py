@@ -1,2 +1,2 @@
-from .message_bus import ClientMessageBus, HostMessageBus
+from .message_bus import ClientNetworkedMessageBus, HostNetworkedMessageBus
 from .messages import *
