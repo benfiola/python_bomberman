@@ -38,6 +38,21 @@ class MessageBus(object):
             self.data_handlers[curr_cls].append(func)
 
 
+class LocalMessageBus(MessageBus):
+    def __init__(self, bus_uuid):
+        super().__init__(bus_uuid)
+
+    def start(self):
+        super().start()
+
+    def stop(self):
+        super().stop()
+
+    def send(self, data):
+        for handler in self.data_handlers[data.__class__]:
+            handler(data)
+
+
 class NetworkedMessageBus(MessageBus):
     def __init__(self, bus_uuid):
         """
@@ -55,8 +70,8 @@ class NetworkedMessageBus(MessageBus):
         self.register_data_handler(IdentifyRequest, self.connection_manager.identify)
         self.register_data_handler(BaseResponse, self.request_manager.on_response)
 
-    def start(self, *args, **kwargs):
-        pass
+    def start(self):
+        super().start()
 
     def send(self, message, target_address=None, blocking=True):
         """
@@ -71,6 +86,7 @@ class NetworkedMessageBus(MessageBus):
         self.request_manager.send(message, connections, blocking)
 
     def stop(self):
+        super().stop()
         self.shutting_down = True
         connections = self.connection_manager.get()
         for connection in connections:
