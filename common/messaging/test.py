@@ -1,11 +1,11 @@
 import unittest
 from . import *
-from ..app_logging import create_logger
+from ..app_logging import logging
 
 
 class TestMessageBus(unittest.TestCase):
     def setUp(self):
-        self.logger = create_logger("message_bus_test")
+        self.logger = logging.getLogger("message_bus_test")
         self.host = InstrumentedHostMessageBus()
         self.clients = [InstrumentedClientMessageBus(num) for num in range(0, 4)]
 

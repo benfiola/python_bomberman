@@ -1,18 +1,12 @@
-from common.exceptions import UnimplementedMethodException
 import json
 
 
 class BaseConfiguration(object):
     def __init__(self):
-        """
-        Defines all options (and sets to None).  Defined in either the Configuration or DefaultConfiguration
-        objects.
-        """
-        self.username = None
-        self.screen_resolution = None
+        pass
 
-    @staticmethod
-    def option_classes():
+    @classmethod
+    def option_classes(cls):
         """
         :return: a map of option classes - key is both the attribute name as well as the JSON key.
         """
@@ -20,7 +14,7 @@ class BaseConfiguration(object):
         subclasses = ConfigurationOption.__subclasses__()
         while subclasses:
             subclass = subclasses.pop()
-            if subclass != UnidentifiedOption:
+            if isinstance(subclass, ConfigurationOption):
                 subclass_subclasses = subclass.__subclasses__()
                 if not subclass_subclasses:
                     to_return[subclass.key()] = subclass
@@ -40,62 +34,6 @@ class BaseConfiguration(object):
                 to_return[attr] = value
 
         return to_return
-
-
-class DefaultConfiguration(BaseConfiguration):
-    def __init__(self):
-        """
-        Default configuration class - has all required configuration settings outlined here.
-
-        Used as a basis for actual user configurations - assumed to be all required parameters necessary
-        for program function.
-        """
-        super().__init__()
-        self.username = UsernameOption("Default")
-        self.screen_resolution = ScreenResolutionOption((800, 600))
-
-
-class Configuration(BaseConfiguration):
-    def __init__(self, filename="config.ini"):
-        """
-        1.  Loads a default configuration.
-        2.  Loads configuration from file.
-        3.  Compares default configuration against loaded configuration.
-        4.  Will remove entries that don't exist in the default configuration.
-        5.  Will add entries that don't exist in the loaded configuration.
-        6.  Will rewrite the configuration file if any modifications were required.
-        """
-        super().__init__()
-        self.filename = filename
-
-        # get the default configuration
-        defaults = DefaultConfiguration()
-        default_options = defaults.options()
-
-        # load a configuration from a file
-        self.load()
-        curr_options = self.options()
-
-        # add options in our default options that don't exist in the loaded options
-        replace_options = []
-        for key in default_options:
-            if key not in curr_options:
-                replace_options.append(default_options[key])
-
-        # delete options in our loaded options that don't exist in our default options.
-        delete_options = []
-        for key in curr_options:
-            if key not in default_options:
-                delete_options.append(curr_options[key])
-
-        for option in replace_options:
-            setattr(self, option.key(), option)
-
-        for option in delete_options:
-            delattr(self, option.key())
-
-        if len(delete_options) or len(replace_options):
-            self.save()
 
     def load(self):
         """
@@ -142,6 +80,62 @@ class Configuration(BaseConfiguration):
             pass
 
 
+class DefaultConfiguration(BaseConfiguration):
+    def __init__(self):
+        super().__init__()
+
+
+class Configuration(BaseConfiguration):
+    def __init__(self, filename):
+        """
+        1.  Loads a default configuration.
+        2.  Loads configuration from file.
+        3.  Compares default configuration against loaded configuration.
+        4.  Will remove entries that don't exist in the default configuration.
+        5.  Will add entries that don't exist in the loaded configuration.
+        6.  Will rewrite the configuration file if any modifications were required.
+        """
+        super().__init__()
+        self.filename = filename
+
+        # get the default configuration
+        defaults = self.get_default_configuration()
+        default_options = defaults.options()
+
+        # load a configuration from a file
+        self.load()
+        curr_options = self.options()
+
+        # add options in our default options that don't exist in the loaded options
+        replace_options = []
+        for key in default_options:
+            if key not in curr_options or isinstance(curr_options[key], UnidentifiedOption):
+                replace_options.append(default_options[key])
+
+        # delete options in our loaded options that don't exist in our default options.
+        delete_options = []
+        for key in curr_options:
+            if key not in default_options:
+                delete_options.append(curr_options[key])
+
+        for option in replace_options:
+            setattr(self, option.key(), option)
+
+        for option in delete_options:
+            delattr(self, option.key())
+
+        if len(delete_options) or len(replace_options):
+            self.save()
+
+    @classmethod
+    def get_default_configuration(cls):
+        """
+        This will return a default configuration for this class.
+        :return:
+        """
+        raise UnimplementedMethodException(cls, "get_default_configuration")
+
+
 class ConfigurationOption(object):
     _key = None
 
@@ -154,7 +148,7 @@ class ConfigurationOption(object):
         return cls._key
 
     def validate(self, new_value):
-        raise UnimplementedMethodException("%s.%s must be implemented." % (self.__class__.__name__, "validate"))
+        raise UnimplementedMethodException(self.__class__, "validate")
 
     def change(self, new_value):
         if self.validate(new_value):
@@ -188,21 +182,6 @@ class InputConfigurationOption(ConfigurationOption):
         return new_value is not None
 
 
-class UsernameOption(InputConfigurationOption):
-    _key = "username"
-
-    def __init__(self, value):
-        super().__init__(str(value))
-
-
-class ScreenResolutionOption(PredefinedConfigurationOption):
-    _key = "screen_resolution"
-    _options = [(640, 480), (800, 600), (1024, 768)]
-
-    def __init__(self, value):
-        super().__init__(tuple(value))
-
-
 # This is only used when loading a configuration where a key doesn't match up to any other options.
 # We overload the ConfigurationOption.key() method to make this work, and we don't care about the value it has.
 class UnidentifiedOption(ConfigurationOption):
@@ -220,3 +199,8 @@ class UnidentifiedOption(ConfigurationOption):
 class ConfigurationException(Exception):
     def __init__(self, key, value):
         super().__init__("The configuration for %s is invalid: %s" % (str(key), str(value)))
+
+
+class UnimplementedMethodException(Exception):
+    def __init__(self, cls, method):
+        super().__init__("The method %s for class %s is unimplemented" % (str(method), str(cls)))

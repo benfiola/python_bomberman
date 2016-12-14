@@ -10,7 +10,3 @@ console_handler.setFormatter(formatter)
 logger = logging.getLogger()
 logger.addHandler(console_handler)
 logger.setLevel(logging.DEBUG)
-
-
-def create_logger(name):
-    return logging.getLogger(name)

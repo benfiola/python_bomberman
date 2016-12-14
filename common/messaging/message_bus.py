@@ -4,13 +4,13 @@ import select
 import pickle
 import queue
 from .messages import *
-from ..app_logging import create_logger
+from ..app_logging import logging
 
 
 class MessageBus(object):
     def __init__(self, bus_uuid):
         self.uuid = bus_uuid
-        self.logger = create_logger("message-bus")
+        self.logger = logging.getLogger("message-bus")
         self.data_handlers = {}
 
     def start(self):
@@ -70,7 +70,7 @@ class NetworkedMessageBus(MessageBus):
         self.register_data_handler(IdentifyRequest, self.connection_manager.identify)
         self.register_data_handler(BaseResponse, self.request_manager.on_response)
 
-    def start(self):
+    def start(self, *args):
         super().start()
 
     def send(self, message, target_address=None, blocking=True):
@@ -184,7 +184,7 @@ class Connection(object):
         :param target_address: The address to connect a new socket to.
         :param target_socket: The socket to use in lieu of creating a new socket.
         """
-        self.logger = create_logger("%s-connection" % bus.uuid)
+        self.logger = logging.getLogger("%s-connection" % bus.uuid)
         self.local_uuid = bus.uuid
         self.remote_uuid = None
         self.shutting_down = False
@@ -375,7 +375,7 @@ class RequestManager(object):
     kinda cluttered the code.
     """
     def __init__(self, bus):
-        self.logger = create_logger("request-manager")
+        self.logger = logging.getLogger("request-manager")
         self.bus = bus
 
         self.pending_requests_lock = threading.Lock()
@@ -428,7 +428,7 @@ class ConnectionManager(object):
     to reduce clutter in the message bus.
     """
     def __init__(self, bus):
-        self.logger = create_logger("connection-manager")
+        self.logger = logging.getLogger("connection-manager")
         self.bus = bus
 
         self.connections_lock = threading.Lock()

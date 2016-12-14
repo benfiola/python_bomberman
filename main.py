@@ -1,16 +1,11 @@
 import sys
-from common import client_configuration
+import time
 from client import Client
-import threading
 
 if __name__ == "__main__":
-    code = 0
-    client = Client(client_configuration)
-    try:
-        code = client.run()
-    except KeyboardInterrupt as e:
-        if client is not None:
-            client.shut_down()
-    sys.exit(code)
+    client = Client()
+    time.sleep(10)
+    sys.exit(0)
+
 
 

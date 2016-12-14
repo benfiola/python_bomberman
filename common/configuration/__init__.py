@@ -1,1 +1,1 @@
-from .configuration import Configuration, ConfigurationException
+from .configuration import BaseConfiguration, DefaultConfiguration, Configuration, ConfigurationOption, InputConfigurationOption, PredefinedConfigurationOption, ConfigurationException
