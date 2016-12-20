@@ -4,7 +4,6 @@ import os, platform as sys_platform
 class Platform(object):
     def __init__(self, font_path):
         self.font_path = font_path
-        self.configure_paths()
 
     def configure_paths(self):
         import client

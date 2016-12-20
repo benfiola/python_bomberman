@@ -1,12 +1,11 @@
 import threading
-
 from common import *
-import client.configuration as configuration
 from .platform_utils import Platform
+Platform.get_platform().configure_paths()
+
+import client.configuration as configuration
 import client.events as events
 import client.controllers as controllers
-
-platform = Platform.get_platform()
 import sdl2.ext
 import time
 
@@ -19,7 +18,7 @@ class Client(object):
         self.event_list_lock = threading.Lock()
         self.shutting_down = False
         self.message_bus = None
-        self.platform = platform
+        self.platform = Platform.get_platform()
         self.configuration = configuration.ClientConfiguration()
         self.fps_counter = FPSCounter()
 
