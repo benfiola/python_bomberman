@@ -8,6 +8,7 @@ import client.controllers as controllers
 
 platform = Platform.get_platform()
 import sdl2.ext
+import time
 
 
 class Client(object):
@@ -20,6 +21,7 @@ class Client(object):
         self.message_bus = None
         self.platform = platform
         self.configuration = configuration.ClientConfiguration()
+        self.fps_counter = FPSCounter()
 
         self.register_event_handler(events.Quit, self.begin_shut_down)
         self.register_event_handler(events.ControllerTransition, self.controller_transition)
@@ -95,12 +97,37 @@ class Client(object):
         return event
 
     def run(self):
+        self.fps_counter.start()
         while not self.shutting_down:
             events = self.get_events()
             for event in events:
                 self.handle_event(event)
             self.controller.process()
+            self.fps_counter.process_frame()
         self.shut_down()
+
+
+class FPSCounter(object):
+    def __init__(self):
+        self.logger = logging.getLogger("fps-counter")
+        self.time = time.time()
+        self.frames = 0
+
+    def start(self):
+        self.reset()
+
+    def reset(self):
+        self.time = time.time()
+        self.frames = 0
+
+    def process_frame(self):
+        curr_time = time.time()
+        if curr_time - self.time >= 1:
+            self.logger.debug("%d frames per second." % self.frames)
+            self.reset()
+        else:
+            self.frames += 1
+
 
 
 
