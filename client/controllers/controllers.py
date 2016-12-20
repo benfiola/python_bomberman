@@ -1,8 +1,10 @@
-from common import logging
+import sdl2.ext
+
 import client.events as events
 import client.graphics as graphics
-import client.controllers.systems as systems
-import sdl2.ext
+import client.systems as systems
+from common import logging
+
 
 class Controller(object):
     def __init__(self, client):
