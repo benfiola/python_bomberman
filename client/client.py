@@ -23,12 +23,13 @@ class Client(object):
 
         self.register_event_handler(events.Quit, self.begin_shut_down)
         self.register_event_handler(events.ControllerTransition, self.controller_transition)
+
+        self.window = sdl2.ext.Window("Bomberman", size=self.configuration.screen_resolution.value())
+
         self.controller = controllers.IntroController(self)
         self.controller.set_up()
 
-        self.window = sdl2.ext.Window("Bomberman", size=self.configuration.screen_resolution.value())
         self.window.show()
-        self.run()
 
     def start_message_bus(self, host_data):
         self.message_bus.start(host_data)
@@ -98,6 +99,7 @@ class Client(object):
             events = self.get_events()
             for event in events:
                 self.handle_event(event)
+            self.controller.process()
         self.shut_down()
 
 

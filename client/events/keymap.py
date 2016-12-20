@@ -158,3 +158,9 @@ class SDL2KeyMap(object):
         sdl2.SDLK_RIGHT: KeyMap.RIGHT,
         sdl2.SDLK_DOWN: KeyMap.DOWN,
     }
+
+    @staticmethod
+    def convert_from_sdl2(key_code):
+        if key_code in SDL2KeyMap.MAP:
+            return SDL2KeyMap.MAP[key_code]
+        return None

@@ -1,1 +1,1 @@
-import sdl2.ext
+from .colors import Colors

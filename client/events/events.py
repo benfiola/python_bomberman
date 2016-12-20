@@ -10,16 +10,10 @@ class Quit(Event):
         super().__init__()
 
 
-class KeyInputEvent(Event, KeyMap):
+class KeyInputEvent(Event, KeyMap, SDL2KeyMap):
     def __init__(self, key_code):
         super().__init__()
         self.key_code = key_code
-
-    @staticmethod
-    def convert_from_sdl2(key_code):
-        if key_code in SDL2KeyMap.MAP:
-            return SDL2KeyMap.MAP[key_code]
-        return None
 
 
 class KeyInputDown(KeyInputEvent):
