@@ -20,11 +20,11 @@ class Controller(object):
         self.on_key_down(event.key_code)
 
     def _key_up(self, event):
-        self.on_key_down(event.key_code)
+        self.on_key_up(event.key_code)
 
     def set_up(self):
         self.client.register_event_handler(events.KeyInputDown, self._key_down)
-        self.client.register_event_handler(events.KeyInputDown, self._key_up)
+        self.client.register_event_handler(events.KeyInputUp, self._key_up)
 
     def tear_down(self):
         self.client.remove_event_handlers(self)
@@ -89,21 +89,21 @@ class MainMenuController(Controller):
             graphics.Colors.BLACK, size=size
         )
         sprite.depth = 0
-        return entities.BackgroundEntity(self.world, sprite, top_left)
+        return entities.BackgroundEntity(self, sprite=sprite, position=top_left)
 
     def selection_entity(self, size, top_left):
         sprite = self.sprite_factory.from_color(
             graphics.Colors.RED, size=size
         )
         sprite.depth = 1
-        return entities.SelectionEntity(self.world, sprite, top_left)
+        return entities.SelectionEntity(self, sprite=sprite, position=top_left)
 
     def menu_entity(self, text, top_left):
         sprite = self.sprite_factory.from_text(
             text, size=14, color=graphics.Colors.WHITE
         )
         sprite.depth = 2
-        return entities.LabelEntity(self.world, text, sprite, top_left)
+        return entities.LabelEntity(self, sprite=sprite, position=top_left)
 
     def set_up(self):
         super().set_up()
@@ -115,12 +115,12 @@ class MainMenuController(Controller):
     def on_key_down(self, key_code):
         if key_code == events.KeyInputEvent.ESC:
             self.client.add_event(events.ControllerTransition(IntroController))
-        if key_code == events.KeyInputEvent.DOWN:
+        if key_code == events.KeyInputEvent.UP:
             new_selection = self.selection.selected_index - 1
             if new_selection < 0:
                 new_selection = len(self.menu_items) - 1
             self.change_selection(new_selection)
-        if key_code == events.KeyInputEvent.UP:
+        if key_code == events.KeyInputEvent.DOWN:
             new_selection = self.selection.selected_index + 1
             if new_selection >= len(self.menu_items):
                 new_selection = 0
@@ -128,10 +128,10 @@ class MainMenuController(Controller):
 
     def change_selection(self, index):
         old_index = self.selection.selected_index
-        target = self.menu_items[index].sprite.position
-        velocity = (0, 2)
+        target = self.menu_items[index].sdl2_entity.sprite.position
+        velocity = (0, 1)
         if old_index > index:
             velocity = (velocity[0], -velocity[1])
         self.selection.selected_index = index
-        self.selection.velocity = entities.Velocity(velocity, target)
+        self.selection.sdl2_entity.velocity = entities.Velocity(velocity, target)
 

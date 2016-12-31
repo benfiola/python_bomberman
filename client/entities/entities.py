@@ -1,54 +1,51 @@
+from . import components
 import common.entities as common_entities
 import client.graphics as graphics
 import sdl2.ext
 import uuid
 
 
-class ClientEntity(sdl2.ext.Entity):
-    def __init__(self, world, uuid):
-        self.uuid = uuid
+class SDL2Entity(sdl2.ext.Entity):
+    def __init__(self, world):
+        super().__init__()
+        self.sprite = None
+        self.velocity = None
+
+
+class ClientEntity(object):
+    def __new__(cls, controller, *args, **kwargs):
+        _uuid = uuid.uuid4()
+        if "uuid" in kwargs:
+            _uuid = kwargs["uuid"]
+
+        entity = object.__new__(cls)
+        entity.controller = controller
+        entity.uuid = _uuid
+        entity._controller = controller
+        entity._uuid = _uuid
+        entity.sdl2_entity = SDL2Entity(controller.world)
+        entity.controller.add_entity(entity)
+
+        return entity
+
+    def __init__(self, controller, *args, **kwargs):
+        if "sprite" in kwargs:
+            self.sdl2_entity.sprite = kwargs["sprite"]
+            if "position" in kwargs:
+                self.sdl2_entity.sprite.position = kwargs["position"]
 
 
 class BackgroundEntity(ClientEntity):
-    def __init__(self, world, sprite, position, uuid=uuid.uuid4()):
-        super().__init__(world, uuid)
-        self.sprite = sprite
-        self.sprite.position = position
+    def __init__(self, controller, *args, **kwargs):
+        super().__init__(controller, *args, **kwargs)
 
 
 class LabelEntity(ClientEntity):
-    def __init__(self, world, text, sprite, position, uuid=uuid.uuid4()):
-        super().__init__(world, uuid)
-        self.text = text
-        self.sprite = sprite
-        self.sprite.position = position
+    def __init__(self, controller, *args, **kwargs):
+        super().__init__(controller, *args, **kwargs)
 
 
 class SelectionEntity(ClientEntity):
-    def __init__(self, world, sprite, position, uuid=uuid.uuid4()):
-        super().__init__(world, uuid)
-        self.sprite = sprite
-        self.sprite.position = position
+    def __init__(self, controller, *args, **kwargs):
+        super().__init__(controller, *args, **kwargs)
         self.selected_index = 0
-
-
-class Bomb(common_entities.Bomb, sdl2.ext.Entity):
-    def __init__(self, sprite, position, world=None):
-        super().__init__()
-
-
-class Player(common_entities.Player, sdl2.ext.Entity):
-    def __init__(self, sprite, position, world=None):
-        super().__init__()
-
-
-class IndestructableWall(common_entities.IndestructableWall, sdl2.ext.Entity):
-    def __init__(self, sprite, position, world=None):
-        super().__init__()
-
-
-class DestructableWall(common_entities.DestructableWall, sdl2.ext.Entity):
-    def __init__(self, sprite, position, world=None):
-        super().__init__()
-
-

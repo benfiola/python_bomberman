@@ -21,9 +21,9 @@ class MenuMovementSystem(sdl2.ext.Applicator):
 
             if velocity.target_coords:
                 t_x, t_y = velocity.target_coords
-                if (o_x < t_x and n_x >= t_x) or (o_x > t_x and n_x <= t_x):
+                if (o_x <= t_x and n_x >= t_x) or (o_x >= t_x and n_x <= t_x):
                     n_x = t_x
-                if (o_y < t_y and n_y >= t_y) or (o_y > t_y and n_y <= t_y):
+                if (o_y <= t_y and n_y >= t_y) or (o_y >= t_y and n_y <= t_y):
                     n_y = t_y
 
             if (n_x, n_y) == velocity.target_coords:
