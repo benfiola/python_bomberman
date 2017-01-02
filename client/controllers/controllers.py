@@ -64,46 +64,63 @@ class MainMenuController(Controller):
     def __init__(self, client):
         super().__init__(client)
 
-        font_size = 14
-
         menu_item_list = [
-            "Single-player",
-            "Multi-player",
-            "Options",
-            "Exit"
+            entities.LabelEntity(self, "Single-player"),
+            entities.LabelEntity(self, "Multi-player"),
+            entities.LabelEntity(self, "Options"),
+            entities.LabelEntity(self, "Exit"),
         ]
 
-        menu_size = (100, len(menu_item_list)*font_size)
-        top_left = (int(self.window_size[0]/2 - menu_size[0]/2), int(self.window_size[1]/2 - menu_size[1]/2))
-        self.background_entity(menu_size, top_left)
-        self.selection = self.selection_entity((100, font_size), top_left)
+        font_size = 14
 
-        menu_item_tl = top_left
-        self.menu_items = []
-        for item in menu_item_list:
-            self.menu_items.append(self.menu_entity(item, menu_item_tl))
-            menu_item_tl = (menu_item_tl[0], menu_item_tl[1]+font_size)
+        root_layout = graphics.GridLayout((1, 1))
+        bg_entity = entities.BackgroundEntity(self)
+        menu_container_layout = root_layout.add_child(bg_entity, (0, 0), (1, 1)).create_layout((6, 6))
 
-    def background_entity(self, size, top_left):
+        menu_container = entities.BackgroundEntity(self)
+        menu_layout = menu_container_layout.add_child(menu_container, (1, 1), (4, 4)).create_layout((1, len(menu_item_list)))
+
+        selection = entities.SelectionEntity(self)
+        menu_layout.add_child(selection, (0, 0), (1, 1))
+
+        for (index, obj) in enumerate(menu_item_list):
+            menu_layout.add_child(obj, (0, index), (1, 1))
+
+        sprite_data = root_layout.finalize(self.client.window.size)
+        for entity in sprite_data.keys():
+            top_left, dimensions = sprite_data[entity]
+            if entity is bg_entity:
+                self.add_color_sprite(entity, dimensions, top_left, graphics.colors.Colors.BLUE, 0)
+            if entity is menu_container:
+                self.add_color_sprite(entity, dimensions, top_left, graphics.colors.Colors.BLACK, 1)
+            if entity is selection:
+                self.add_color_sprite(entity, dimensions, top_left, graphics.colors.Colors.RED, 2)
+            if entity in menu_item_list:
+                self.add_text_sprite(entity, entity.text, 14, dimensions, top_left, graphics.colors.Colors.WHITE, 3)
+
+        self.selection = selection
+        self.menu_items = menu_item_list
+
+    def add_color_sprite(self, entity, size, top_left, color, depth):
         sprite = self.sprite_factory.from_color(
-            graphics.Colors.BLACK, size=size
+            color, size=size
         )
-        sprite.depth = 0
-        return entities.BackgroundEntity(self, sprite=sprite, position=top_left)
+        sprite.position = top_left
+        sprite.depth = depth
+        entity.sdl2_entity.sprite = sprite
 
-    def selection_entity(self, size, top_left):
-        sprite = self.sprite_factory.from_color(
-            graphics.Colors.RED, size=size
-        )
-        sprite.depth = 1
-        return entities.SelectionEntity(self, sprite=sprite, position=top_left)
-
-    def menu_entity(self, text, top_left):
+    def add_text_sprite(self, entity, text, font_size, dimensions, top_left, color, depth, center_x=True, center_y=True):
         sprite = self.sprite_factory.from_text(
-            text, size=14, color=graphics.Colors.WHITE
+            text, size=font_size, color=color
         )
-        sprite.depth = 2
-        return entities.LabelEntity(self, sprite=sprite, position=top_left)
+        sprite.position = top_left
+        sprite_size = sprite.size
+        if center_y:
+            sprite.position = (sprite.position[0], sprite.position[1] + int(dimensions[1]/2 - sprite.size[1]/2))
+        if center_x:
+            sprite.position = (sprite.position[0] + int(dimensions[0]/2 - sprite.size[0]/2), sprite.position[1])
+        sprite.depth = depth
+        entity.sdl2_entity.sprite = sprite
 
     def set_up(self):
         super().set_up()

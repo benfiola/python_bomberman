@@ -1,1 +1,1 @@
-from .controllers import IntroController
+from .controllers import IntroController, MainMenuController

@@ -41,8 +41,9 @@ class BackgroundEntity(ClientEntity):
 
 
 class LabelEntity(ClientEntity):
-    def __init__(self, controller, *args, **kwargs):
+    def __init__(self, controller, text, *args, **kwargs):
         super().__init__(controller, *args, **kwargs)
+        self.text = text
 
 
 class SelectionEntity(ClientEntity):
