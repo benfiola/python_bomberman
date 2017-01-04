@@ -1,3 +1,7 @@
+from lxml import etree
+import xmltodict
+from io import StringIO
+
 class GridElement(object):
     def __init__(self, grid_loc, grid_size):
         self.grid_location = grid_loc
@@ -51,4 +55,23 @@ class GridLayout(object):
             to_return[element] = (top_left, dimensions)
             if obj.layout:
                 obj.layout._sprite_dimension_data(to_return)
+
+
+class LayoutParser(object):
+    schema = etree.XMLSchema(etree.parse('layout.xsd'))
+
+    @classmethod
+    def generate_layout(cls, filename):
+        with open(filename, 'r') as f:
+            file_text = f.read()
+        doc = etree.parse(StringIO(file_text))
+        if not cls.schema.validate(doc):
+            raise Exception("XML for %s does not conform to schema." % filename)
+        xml_dict = xmltodict.parse(file_text)
+        print(xml_dict)
+
+LayoutParser.generate_layout('layout.xml')
+
+
+
 

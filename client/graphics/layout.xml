@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<root-layout cols="1" rows="1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="pb ./layout.xsd" xmlns="pb">
+    <element col="1" row="1" height="2" width="2">
+        test
+    </element>
+</root-layout>

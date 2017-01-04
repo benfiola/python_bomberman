@@ -8,5 +8,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'PySDL2',
+        'xmltodict',
+        'lxml'
     ]
 )

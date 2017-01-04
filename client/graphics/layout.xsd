@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+targetNamespace="pb"
+xmlns="pb"
+elementFormDefault="qualified">
+    <xs:attributeGroup name="size">
+        <xs:attribute use="required" name="width" type="xs:positiveInteger" />
+        <xs:attribute use="required" name="height" type="xs:positiveInteger" />
+    </xs:attributeGroup>
+    <xs:attributeGroup name="location">
+        <xs:attribute use="required" name="row" type="xs:positiveInteger" />
+        <xs:attribute use="required" name="col" type="xs:positiveInteger" />
+    </xs:attributeGroup>
+    <xs:attributeGroup name="grid-size">
+        <xs:attribute use="required" name="rows" type="xs:positiveInteger" />
+        <xs:attribute use="required" name="cols" type="xs:positiveInteger" />
+    </xs:attributeGroup>
+    <xs:group name="elements">
+        <xs:choice>
+            <xs:element name="element" type="element-type"/>
+            <xs:element name="layout" type="layout-type" />
+        </xs:choice>
+    </xs:group>
+
+    <xs:complexType name="root-layout-type">
+        <xs:group minOccurs="1" maxOccurs="unbounded" ref="elements" />
+        <xs:attributeGroup ref="grid-size" />
+    </xs:complexType>
+    <xs:complexType name="layout-type">
+        <xs:complexContent>
+            <xs:extension base="root-layout-type">
+                <xs:attributeGroup ref="location"/>
+                <xs:attributeGroup ref="size"/>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+    <xs:complexType name="element-type">
+        <xs:simpleContent>
+            <xs:extension base="xs:string">
+                <xs:attributeGroup ref="location" />
+                <xs:attributeGroup ref="size" />
+            </xs:extension>
+        </xs:simpleContent>
+    </xs:complexType>
+    <xs:element name="root-layout" type="root-layout-type"/>
+</xs:schema>
