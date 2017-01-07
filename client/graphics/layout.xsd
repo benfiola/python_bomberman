@@ -3,86 +3,41 @@
 targetNamespace="pb"
 xmlns="pb"
 elementFormDefault="qualified">
-    <!-- define our attribute groups here -->
-    <xs:attributeGroup name="size">
-        <xs:attribute use="required" name="width" type="xs:positiveInteger" />
-        <xs:attribute use="required" name="height" type="xs:positiveInteger" />
-    </xs:attributeGroup>
+
     <xs:attributeGroup name="location">
-        <xs:attribute use="required" name="row" type="xs:nonNegativeInteger" />
-        <xs:attribute use="required" name="col" type="xs:nonNegativeInteger" />
+        <xs:attribute use="optional" default="0" name="x" type="xs:nonNegativeInteger" />
+        <xs:attribute use="optional" default="0" name="y" type="xs:nonNegativeInteger" />
     </xs:attributeGroup>
-    <xs:attributeGroup name="grid-size">
-        <xs:attribute use="required" name="rows" type="xs:positiveInteger" />
-        <xs:attribute use="required" name="cols" type="xs:positiveInteger" />
+    <xs:attributeGroup name="size">
+        <xs:attribute use="optional" default="1" name="w" type="xs:positiveInteger" />
+        <xs:attribute use="optional" default="1" name="h" type="xs:positiveInteger" />
     </xs:attributeGroup>
-    <xs:attributeGroup name="sprite-attributes">
-        <xs:attribute use="required" name="color" type="xs:string" />
+    <xs:attributeGroup name="dimensions">
+        <xs:attribute use="optional" default="1" name="r" type="xs:positiveInteger" />
+        <xs:attribute use="optional" default="1" name="c" type="xs:positiveInteger" />
+    </xs:attributeGroup>
+    <xs:attributeGroup name="binding">
         <xs:attribute use="optional" name="tag" type="xs:string" />
     </xs:attributeGroup>
-    <xs:attributeGroup name="text-sprite-attributes">
-        <xs:attribute use="required" name="text" type="xs:string" />
-    </xs:attributeGroup>
 
-    <!-- define our types here -->
-    <!-- sprite data types -->
-    <xs:complexType name="sprite-type">
-        <xs:attributeGroup ref="sprite-attributes" />
+    <xs:group name="container-group">
+        <xs:choice>
+            <xs:element name="container" type="container-type"/>
+        </xs:choice>
+    </xs:group>
+
+
+    <xs:complexType name="root-container-type">
+        <xs:group minOccurs="0" maxOccurs="unbounded" ref="container-group"/>
+        <xs:attributeGroup ref="dimensions"/>
     </xs:complexType>
-    <xs:complexType name="text-sprite-type">
-        <xs:complexContent>
-            <xs:extension base="sprite-type">
-                <xs:attributeGroup ref="text-sprite-attributes" />
-            </xs:extension>
-        </xs:complexContent>
-    </xs:complexType>
-    <xs:complexType name="color-sprite-type">
-        <xs:complexContent>
-            <xs:extension base="sprite-type">
-            </xs:extension>
-        </xs:complexContent>
-    </xs:complexType>
-    <!-- layout types -->
-    <xs:complexType name="root-layout-type">
-        <xs:sequence>
-            <xs:group minOccurs="1" maxOccurs="unbounded" ref="elements" />
-            <xs:group minOccurs="0" maxOccurs="1" ref="sprite" />
-        </xs:sequence>
-        <xs:attributeGroup ref="grid-size" />
-    </xs:complexType>
-    <xs:complexType name="layout-type">
-        <xs:complexContent>
-            <xs:extension base="root-layout-type">
-                <xs:attributeGroup ref="location"/>
-                <xs:attributeGroup ref="size"/>
-            </xs:extension>
-        </xs:complexContent>
-    </xs:complexType>
-    <!-- element types -->
-    <xs:complexType name="element-type">
-        <xs:sequence>
-            <xs:group minOccurs="0" maxOccurs="1" ref="sprite" />
-        </xs:sequence>
+    <xs:complexType name="container-type">
+        <xs:group minOccurs="0" maxOccurs="unbounded" ref="container-group"/>
         <xs:attributeGroup ref="location" />
         <xs:attributeGroup ref="size" />
+        <xs:attributeGroup ref="binding" />
+        <xs:attributeGroup ref="dimensions"/>
     </xs:complexType>
 
-    <!-- define our element groups here -->
-    <!-- element/layout choice group -->
-    <xs:group name="elements">
-        <xs:choice>
-            <xs:element name="element" type="element-type"/>
-            <xs:element name="layout" type="layout-type" />
-        </xs:choice>
-    </xs:group>
-    <!-- sprite choice group -->
-    <xs:group name="sprite">
-        <xs:choice>
-            <xs:element name="text-sprite" type="text-sprite-type"/>
-            <xs:element name="color-sprite" type="color-sprite-type"/>
-        </xs:choice>
-    </xs:group>
-
-    <!-- our root element for our document -->
-    <xs:element name="root-layout" type="root-layout-type"/>
+    <xs:element name="container" type="root-container-type"/>
 </xs:schema>

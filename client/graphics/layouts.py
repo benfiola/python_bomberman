@@ -1,7 +1,6 @@
 from lxml import etree
 import xmltodict
 from io import StringIO
-from .colors import Colors
 import os
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -12,129 +11,100 @@ class BaseXMLElement(object):
         raise LayoutException("Unimplemented method convert for class %s." % cls.__name__)
 
 
-class Element(BaseXMLElement):
-    def __init__(self, location, size):
+class Container(BaseXMLElement):
+    def __init__(self, location, size, tag, dimensions):
         self.location = location
         self.size = size
+        self.tag = tag
+        self.dimensions = dimensions
 
-        self.sprite_data = None
+        self.children = []
+        self.tagged_containers = {}
+        self.depth = None
+        self.grid_size = None
         self.absolute_location = None
         self.absolute_size = None
 
-    def finalize(self, pixel_dimensions, pixel_location=(0, 0)):
+    def add_container(self, child):
+        # if the child has a tag, process it.
+        if child.tag:
+            if child.tag in self.tagged_containers:
+                raise LayoutException("Duplicate container tag %s found." % child.tag)
+            self.tagged_containers[child.tag] = child
+
+        # now process the tagged container keys the child knows of.
+        for container_keys in child.tagged_containers.keys():
+            if container_keys in self.tagged_containers:
+                raise LayoutException("Duplicate container tag %s found." % container_keys)
+            self.tagged_containers[container_keys] = child.tagged_containers[container_keys]
+
+        # finally, add the child to the list of children this layout is aware of.
+        self.children.append(child)
+
+    def tagged_container(self, tag):
+        if tag not in self.tagged_containers:
+            raise LayoutException("Tagged container %s does not exist" % tag)
+        return self.tagged_containers[tag]
+
+    def finalize(self, pixel_dimensions, pixel_location=(0, 0), depth=0):
+        self.validate()
         self.absolute_location = pixel_location
         self.absolute_size = pixel_dimensions
+        self.depth = depth
+        self.grid_size = (pixel_dimensions[0] / self.dimensions[0], pixel_dimensions[1] / self.dimensions[1])
 
-    @classmethod
-    def convert(cls, xml_data, parser):
-        return cls(
-            (int(xml_data["@col"]), int(xml_data["@row"])),
-            (int(xml_data["@width"]), int(xml_data["@height"]))
-        )
-
-
-class Layout(Element):
-    def __init__(self, location, size, dimensions):
-        super().__init__(location, size)
-        self.children = []
-        self.dimensions = dimensions
-
-    def finalize(self, pixel_dimensions, pixel_location=(0, 0)):
-        super().finalize(pixel_dimensions, pixel_location)
-        grid_size = (pixel_dimensions[0] / self.dimensions[0], pixel_dimensions[1] / self.dimensions[1])
         for child in self.children:
-            child_size = (int(grid_size[0] * child.size[0]), int(grid_size[1] * child.size[1]))
-            child_location = (int(grid_size[0] * child.location[0]), int(grid_size[1] * child.location[1]))
-            child.finalize(child_size, child_location)
+            child_size = (int(self.grid_size[0] * child.size[0]), int(self.grid_size[1] * child.size[1]))
+            child_location = (int((self.grid_size[0] * child.location[0]) + self.absolute_location[0]), int((self.grid_size[1] * child.location[1]) + self.absolute_location[1]))
+            child.finalize(child_size, child_location, depth=depth+1)
         return self
 
-    @classmethod
-    def convert(cls, xml_data, parser, depth=0):
-        new_layout = Layout(
-            (int(xml_data["@col"]), int(xml_data["@row"])),
-            (int(xml_data["@width"]), int(xml_data["@height"])),
-            (int(xml_data["@cols"]), int(xml_data["@rows"]))
-        )
-
-        # convert the children of the layout
-        for key in xml_data:
-            if key in parser.TAG_MAP:
-                xml_element_class = parser.TAG_MAP[key]
-                if key in ["element", "layout"]:
-                    children_dicts = xml_data[key]
-                    if type(children_dicts) != list:
-                        children_dicts = [children_dicts]
-                    for children_dict in children_dicts:
-                        new_layout.children.append(xml_element_class.convert(children_dict, parser))
-                if key in ["text-sprite", "color-sprite"]:
-                    new_layout.sprite_data = xml_element_class.convert(xml_data[key], parser)
-
+    def validate(self):
         # validate the children of the layout
-        for child in new_layout.children:
-            if child.location[0] + child.size[0] > new_layout.size[0] or \
-                                    child.location[1] + child.size[1] > new_layout.size[1]:
+        for child in self.children:
+            if child.location[0] + child.size[0] > self.size[0] or \
+                                    child.location[1] + child.size[1] > self.size[1]:
                 raise LayoutException("Child with location %s and size %s exceeds parent's size %s." % (
                     str(child.location),
                     str(child.size),
-                    str(new_layout.size)
+                    str(self.size)
                 ))
 
-        return new_layout
-
-
-class SpriteData(BaseXMLElement):
-    def __init__(self, color, tag):
-        self.color = color
-        self.tag = tag
-
-
-class TextSprite(SpriteData):
-    def __init__(self, color, tag, text):
-        super().__init__(color, tag)
-        self.text = text
-
     @classmethod
-    def convert(cls, xml_data, parser):
-        tag = xml_data["@tag"] if "@tag" in xml_data else None
-        color = Colors.find_color(xml_data["@color"])
-        return TextSprite(
-            color,
+    def convert(cls, xml_data, parser, depth=0):
+        tag = xml_data["@tag"] if "@tag" in xml_data and xml_data["@tag"] else None
+        dimensions = (int(xml_data["@c"]), int(xml_data["@r"])) if "@c" in xml_data and "@r" in xml_data else (1, 1)
+        location = (int(xml_data["@x"]), int(xml_data["@y"])) if "@x" in xml_data and "@r" in xml_data else(0, 0)
+        size = (int(xml_data["@w"]), int(xml_data["@h"])) if "@w" in xml_data and "@h" in xml_data else (1, 1)
+        new_layout = Container(
+            location,
+            size,
             tag,
-            xml_data["@text"]
+            dimensions
         )
 
-
-class ColorSprite(SpriteData):
-    def __init__(self, color, tag):
-        super().__init__(color, tag)
-
-    @classmethod
-    def convert(cls, xml_data, parser):
-        tag = xml_data["@tag"] if "@tag" in xml_data else None
-        color = Colors.find_color(xml_data["@color"])
-        return ColorSprite(
-            color,
-            tag
-        )
+        for key in xml_data.keys():
+            if not key.startswith("@"):
+                elements = xml_data[key]
+                if type(elements) != list:
+                    elements = [elements]
+                for element in elements:
+                    child = Container.convert(element, parser)
+                    new_layout.add_container(child)
+        return new_layout
 
 
 class LayoutParser(object):
     SCHEMA = etree.XMLSchema(etree.parse(os.path.join(CURR_DIR, 'layout.xsd')))
-    TAG_MAP = {
-        "element": Element,
-        "layout": Layout,
-        "color-sprite": ColorSprite,
-        "text-sprite": TextSprite
-    }
 
     @classmethod
-    def normalize_root_layout(cls, xml_dict):
+    def normalize_root_container(cls, xml_dict):
         # a root layout doesn't require row, col, height or width
         # because it's assumed it's (0, 0) and (cols, rows) respectively.
-        xml_dict["@row"] = 0
-        xml_dict["@col"] = 0
-        xml_dict["@width"] = xml_dict["@cols"]
-        xml_dict["@height"] = xml_dict["@rows"]
+        xml_dict["@y"] = 0
+        xml_dict["@x"] = 0
+        xml_dict["@w"] = xml_dict["@c"]
+        xml_dict["@h"] = xml_dict["@r"]
 
     @classmethod
     def generate_layout(cls, filename):
@@ -143,9 +113,9 @@ class LayoutParser(object):
         doc = etree.parse(StringIO(file_text))
         if not cls.SCHEMA.validate(doc):
             raise LayoutException("XML for %s does not conform to schema." % filename)
-        xml_dict = xmltodict.parse(file_text)
-        cls.normalize_root_layout(xml_dict["root-layout"])
-        return Layout.convert(xml_dict["root-layout"], cls)
+        xml_dict = xmltodict.parse(file_text)["container"]
+        cls.normalize_root_container(xml_dict)
+        return Container.convert(xml_dict, cls)
 
 
 class LayoutException(Exception):

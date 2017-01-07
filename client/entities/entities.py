@@ -25,16 +25,17 @@ class ClientEntity(object):
 
         return entity
 
+    def add_sprite(self, sprite):
+        self.sdl2_entity.sprite = sprite
+
     def __init__(self, controller, *args, **kwargs):
-        if "sprite" in kwargs:
-            self.sdl2_entity.sprite = kwargs["sprite"]
-            if "position" in kwargs:
-                self.sdl2_entity.sprite.position = kwargs["position"]
+        pass
 
 
-class BackgroundEntity(ClientEntity):
-    def __init__(self, controller, *args, **kwargs):
+class ColorEntity(ClientEntity):
+    def __init__(self, controller, color, *args, **kwargs):
         super().__init__(controller, *args, **kwargs)
+        self.color = color
 
 
 class LabelEntity(ClientEntity):

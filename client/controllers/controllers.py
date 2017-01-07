@@ -9,12 +9,13 @@ import os
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class Controller(object):
-    def __init__(self, client):
+    def __init__(self, client, layout_file):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.client = client
         self.world = sdl2.ext.World()
         self.sprite_factory = graphics.BaseSpriteFactory()
         self.window_size = self.client.window.size
+        self.layout = graphics.LayoutParser.generate_layout(os.path.join(CURR_DIR, layout_file)).finalize(self.window_size)
         self.entities = {}
 
     def _key_down(self, event):
@@ -48,11 +49,18 @@ class Controller(object):
 
 class IntroController(Controller):
     def __init__(self, client):
-        super().__init__(client)
-        self.layout = graphics.LayoutParser.generate_layout(os.path.join(CURR_DIR, "intro-layout.xml")).finalize(self.client.window.size)
+        super().__init__(client, "intro-layout.xml")
 
     def set_up(self):
         super().set_up()
+        background_entity = entities.ColorEntity(self, graphics.Colors.BLUE)
+        background_entity.add_sprite(self.sprite_factory.color(background_entity.color, self.layout))
+        title_entity = entities.LabelEntity(self, "Bomberman")
+        title_entity.add_sprite(self.sprite_factory.text(title_entity.text, self.layout.tagged_containers["title"]))
+        enter_entity = entities.LabelEntity(self, "Press ENTER to continue.")
+        enter_entity.add_sprite(self.sprite_factory.text(enter_entity.text, self.layout.tagged_containers["enter-message"]))
+        esc_entity = entities.LabelEntity(self, "Press ESC to exit.")
+        esc_entity.add_sprite(self.sprite_factory.text(esc_entity.text, self.layout.tagged_containers["esc-message"]))
         self.world.add_system(systems.SoftwareRenderer(self.client.window))
 
     def on_key_down(self, key_code):
@@ -76,10 +84,10 @@ class MainMenuController(Controller):
         font_size = 14
 
         root_layout = graphics.GridLayout((1, 1))
-        bg_entity = entities.BackgroundEntity(self)
+        bg_entity = entities.ColorEntity(self)
         menu_container_layout = root_layout.add_child(bg_entity, (0, 0), (1, 1)).create_layout((6, 6))
 
-        menu_container = entities.BackgroundEntity(self)
+        menu_container = entities.ColorEntity(self)
         menu_layout = menu_container_layout.add_child(menu_container, (1, 1), (4, 4)).create_layout((1, len(menu_item_list)))
 
         selection = entities.SelectionEntity(self)
