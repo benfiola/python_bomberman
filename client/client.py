@@ -27,7 +27,7 @@ class Client(object):
 
         self.window = sdl2.ext.Window("Bomberman", size=self.configuration.screen_resolution.value())
 
-        self.controller = controllers.MainMenuController(self)
+        self.controller = controllers.IntroController(self)
         self.controller.set_up()
 
         self.window.show()

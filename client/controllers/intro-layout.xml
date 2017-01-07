@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<root-layout cols="8" rows="8" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="pb ./layout.xsd" xmlns="pb">
+    <layout col="2" row="1" height="1" width="4" cols="1" rows="1">
+        <element col="0" row="0" height="1" width="1">
+            <text-sprite text="Bomberman" color="white"/>
+        </element>
+        <color-sprite color="black"/>
+    </layout>
+    <element col="1" row="6" height="1" width="6">
+        <text-sprite text="Press ENTER to continue" color="white"/>
+    </element>
+    <color-sprite color="red"/>
+</root-layout>

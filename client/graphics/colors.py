@@ -1,5 +1,6 @@
 import sdl2.ext
 
+
 class Colors(object):
     BLUE = sdl2.ext.Color(0, 0, 255)
     RED = sdl2.ext.Color(255, 0, 0)
@@ -10,3 +11,8 @@ class Colors(object):
     PURPLE = sdl2.ext.Color(255, 0, 255)
     LIGHT_BLUE = sdl2.ext.Color(0, 255, 255)
     GRAY = sdl2.ext.Color(128, 128, 128)
+
+    @classmethod
+    def find_color(cls, color_string):
+        to_return = getattr(cls, color_string.upper(), None)
+        return to_return

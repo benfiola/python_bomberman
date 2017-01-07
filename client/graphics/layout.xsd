@@ -9,8 +9,8 @@ elementFormDefault="qualified">
         <xs:attribute use="required" name="height" type="xs:positiveInteger" />
     </xs:attributeGroup>
     <xs:attributeGroup name="location">
-        <xs:attribute use="required" name="row" type="xs:positiveInteger" />
-        <xs:attribute use="required" name="col" type="xs:positiveInteger" />
+        <xs:attribute use="required" name="row" type="xs:nonNegativeInteger" />
+        <xs:attribute use="required" name="col" type="xs:nonNegativeInteger" />
     </xs:attributeGroup>
     <xs:attributeGroup name="grid-size">
         <xs:attribute use="required" name="rows" type="xs:positiveInteger" />

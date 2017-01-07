@@ -5,7 +5,8 @@ import client.entities as entities
 import client.graphics as graphics
 import client.systems as systems
 from common import logging
-
+import os
+CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class Controller(object):
     def __init__(self, client):
@@ -48,10 +49,11 @@ class Controller(object):
 class IntroController(Controller):
     def __init__(self, client):
         super().__init__(client)
+        self.layout = graphics.LayoutParser.generate_layout(os.path.join(CURR_DIR, "intro-layout.xml")).finalize(self.client.window.size)
 
     def set_up(self):
         super().set_up()
-        self.world.add_system(systems.SoftwareRenderer(self.client.window, bg_color=graphics.Colors.BLUE))
+        self.world.add_system(systems.SoftwareRenderer(self.client.window))
 
     def on_key_down(self, key_code):
         if key_code == events.KeyInputEvent.ESC:
@@ -96,7 +98,7 @@ class MainMenuController(Controller):
             if entity is selection:
                 self.add_color_sprite(entity, dimensions, top_left, graphics.colors.Colors.RED, 2)
             if entity in menu_item_list:
-                self.add_text_sprite(entity, entity.text, 14, dimensions, top_left, graphics.colors.Colors.WHITE, 3)
+                self.add_text_sprite(entity, entity.text, font_size, dimensions, top_left, graphics.colors.Colors.WHITE, 3)
 
         self.selection = selection
         self.menu_items = menu_item_list
@@ -127,7 +129,7 @@ class MainMenuController(Controller):
 
         self.client.register_event_handler(events.KeyInputDown, self.on_key_down)
         self.world.add_system(systems.MenuMovementSystem())
-        self.world.add_system(systems.SoftwareRenderer(self.client.window, bg_color=graphics.Colors.BLACK))
+        self.world.add_system(systems.SoftwareRenderer(self.client.window))
 
     def on_key_down(self, key_code):
         if key_code == events.KeyInputEvent.ESC:

@@ -1,6 +1,3 @@
-from . import components
-import common.entities as common_entities
-import client.graphics as graphics
 import sdl2.ext
 import uuid
 
