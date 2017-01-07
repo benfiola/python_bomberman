@@ -3,6 +3,7 @@
 targetNamespace="pb"
 xmlns="pb"
 elementFormDefault="qualified">
+    <!-- define our attribute groups here -->
     <xs:attributeGroup name="size">
         <xs:attribute use="required" name="width" type="xs:positiveInteger" />
         <xs:attribute use="required" name="height" type="xs:positiveInteger" />
@@ -15,15 +16,38 @@ elementFormDefault="qualified">
         <xs:attribute use="required" name="rows" type="xs:positiveInteger" />
         <xs:attribute use="required" name="cols" type="xs:positiveInteger" />
     </xs:attributeGroup>
-    <xs:group name="elements">
-        <xs:choice>
-            <xs:element name="element" type="element-type"/>
-            <xs:element name="layout" type="layout-type" />
-        </xs:choice>
-    </xs:group>
+    <xs:attributeGroup name="sprite-attributes">
+        <xs:attribute use="required" name="color" type="xs:string" />
+        <xs:attribute use="optional" name="tag" type="xs:string" />
+    </xs:attributeGroup>
+    <xs:attributeGroup name="text-sprite-attributes">
+        <xs:attribute use="required" name="text" type="xs:string" />
+    </xs:attributeGroup>
 
+    <!-- define our types here -->
+    <!-- sprite data types -->
+    <xs:complexType name="sprite-type">
+        <xs:attributeGroup ref="sprite-attributes" />
+    </xs:complexType>
+    <xs:complexType name="text-sprite-type">
+        <xs:complexContent>
+            <xs:extension base="sprite-type">
+                <xs:attributeGroup ref="text-sprite-attributes" />
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+    <xs:complexType name="color-sprite-type">
+        <xs:complexContent>
+            <xs:extension base="sprite-type">
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+    <!-- layout types -->
     <xs:complexType name="root-layout-type">
-        <xs:group minOccurs="1" maxOccurs="unbounded" ref="elements" />
+        <xs:sequence>
+            <xs:group minOccurs="1" maxOccurs="unbounded" ref="elements" />
+            <xs:group minOccurs="0" maxOccurs="1" ref="sprite" />
+        </xs:sequence>
         <xs:attributeGroup ref="grid-size" />
     </xs:complexType>
     <xs:complexType name="layout-type">
@@ -34,13 +58,31 @@ elementFormDefault="qualified">
             </xs:extension>
         </xs:complexContent>
     </xs:complexType>
+    <!-- element types -->
     <xs:complexType name="element-type">
-        <xs:simpleContent>
-            <xs:extension base="xs:string">
-                <xs:attributeGroup ref="location" />
-                <xs:attributeGroup ref="size" />
-            </xs:extension>
-        </xs:simpleContent>
+        <xs:sequence>
+            <xs:group minOccurs="0" maxOccurs="1" ref="sprite" />
+        </xs:sequence>
+        <xs:attributeGroup ref="location" />
+        <xs:attributeGroup ref="size" />
     </xs:complexType>
+
+    <!-- define our element groups here -->
+    <!-- element/layout choice group -->
+    <xs:group name="elements">
+        <xs:choice>
+            <xs:element name="element" type="element-type"/>
+            <xs:element name="layout" type="layout-type" />
+        </xs:choice>
+    </xs:group>
+    <!-- sprite choice group -->
+    <xs:group name="sprite">
+        <xs:choice>
+            <xs:element name="text-sprite" type="text-sprite-type"/>
+            <xs:element name="color-sprite" type="color-sprite-type"/>
+        </xs:choice>
+    </xs:group>
+
+    <!-- our root element for our document -->
     <xs:element name="root-layout" type="root-layout-type"/>
 </xs:schema>
