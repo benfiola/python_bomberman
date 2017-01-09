@@ -7,6 +7,8 @@ class IntroController(Controller):
 
     def set_up(self):
         super().set_up()
+        self.layout.finalize(self.window_size)
+
         background_entity = entities.ColorEntity(self, graphics.Colors.BLUE)
         self.sprite_factory.color(background_entity, self.layout)
         title_entity = entities.LabelEntity(self, "Bomberman", graphics.Colors.WHITE)

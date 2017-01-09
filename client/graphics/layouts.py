@@ -17,9 +17,9 @@ class Container(BaseXMLElement):
         self.size = size
         self.tag = tag
         self.dimensions = dimensions if dimensions else (1, 1)
-
         self.children = []
         self.tagged_containers = {}
+        self.parent = None
         self.depth = None
         self.grid_size = None
         self.absolute_location = None
@@ -27,6 +27,22 @@ class Container(BaseXMLElement):
 
     def add_container(self, child):
         self.children.append(child)
+        child.parent = self
+
+        # process tags
+        # first, collect all fo the tags of the child including its own.
+        tags_to_process = dict((key, child.tagged_containers[key]) for key in child.tagged_containers.keys())
+        if child.tag is not None:
+            tags_to_process[child.tag] = child
+
+        # now go up the chain, adding tags to each tagged containers collection.
+        curr_parent = self
+        while curr_parent:
+            for tag in tags_to_process.keys():
+                if tag in curr_parent.tagged_containers:
+                    raise LayoutException("Duplicate container tag %s found." % tag)
+                curr_parent.tagged_containers[tag] = tags_to_process[tag]
+            curr_parent = curr_parent.parent
 
     def container(self, tag):
         if tag not in self.tagged_containers:
@@ -35,7 +51,6 @@ class Container(BaseXMLElement):
 
     def finalize(self, pixel_dimensions, pixel_location=(0, 0), depth=0):
         self.validate()
-        self.tagged_containers = {}
         self.absolute_location = pixel_location
         self.absolute_size = pixel_dimensions
         self.depth = depth
@@ -45,18 +60,6 @@ class Container(BaseXMLElement):
             child_size = (int(self.grid_size[0] * child.size[0]), int(self.grid_size[1] * child.size[1]))
             child_location = (int((self.grid_size[0] * child.location[0]) + self.absolute_location[0]), int((self.grid_size[1] * child.location[1]) + self.absolute_location[1]))
             child.finalize(child_size, child_location, depth=depth+1)
-
-            # if the child has a tag, process it.
-            if child.tag:
-                if child.tag in self.tagged_containers:
-                    raise LayoutException("Duplicate container tag %s found." % child.tag)
-                self.tagged_containers[child.tag] = child
-
-            # now process the tagged container keys the child knows of.
-            for container_keys in child.tagged_containers.keys():
-                if container_keys in self.tagged_containers:
-                    raise LayoutException("Duplicate container tag %s found." % container_keys)
-                self.tagged_containers[container_keys] = child.tagged_containers[container_keys]
 
         return self
 
@@ -72,7 +75,7 @@ class Container(BaseXMLElement):
                 ))
 
     @classmethod
-    def convert(cls, xml_data, parser, depth=0):
+    def convert(cls, xml_data, parser):
         tag = xml_data["@tag"] if "@tag" in xml_data and xml_data["@tag"] else None
         dimensions = (int(xml_data["@c"]), int(xml_data["@r"])) if "@c" in xml_data and "@r" in xml_data else None
         location = (int(xml_data["@x"]), int(xml_data["@y"])) if "@x" in xml_data and "@y" in xml_data else(0, 0)

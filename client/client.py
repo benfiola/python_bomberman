@@ -28,7 +28,7 @@ class Client(object):
 
         self.window = sdl2.ext.Window("Bomberman", size=self.configuration.screen_resolution.value())
 
-        self.controller_transition(events.ControllerTransition(controller.IntroController))
+        self.add_event(events.ControllerTransition(controller.IntroController))
         self.window.show()
 
     def start_message_bus(self, host_data):
@@ -51,7 +51,6 @@ class Client(object):
         if self.controller:
             self.controller.tear_down()
         self.controller = event.controller_class(self)
-        self.controller.prepare_layout()
         self.controller.set_up()
 
     def handle_event(self, event):

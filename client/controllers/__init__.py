@@ -30,9 +30,6 @@ class Controller(object):
     def _key_up(self, event):
         self.on_key_up(event.key_code)
 
-    def prepare_layout(self):
-        self.layout.finalize(self.window_size)
-
     def set_up(self):
         self.client.register_event_handler(events.KeyInputDown, self._key_down)
         self.client.register_event_handler(events.KeyInputUp, self._key_up)
