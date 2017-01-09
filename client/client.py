@@ -18,6 +18,7 @@ class Client(object):
         self.event_list_lock = threading.Lock()
         self.shutting_down = False
         self.message_bus = None
+        self.controller = None
         self.platform = Platform.get_platform()
         self.configuration = configuration.ClientConfiguration()
         self.fps_counter = FPSCounter()
@@ -27,9 +28,7 @@ class Client(object):
 
         self.window = sdl2.ext.Window("Bomberman", size=self.configuration.screen_resolution.value())
 
-        self.controller = controllers.IntroController(self)
-        self.controller.set_up()
-
+        self.controller_transition(events.ControllerTransition(controllers.IntroController))
         self.window.show()
 
     def start_message_bus(self, host_data):
@@ -49,8 +48,10 @@ class Client(object):
         self.remove_event_handlers(self)
 
     def controller_transition(self, event):
-        self.controller.tear_down()
+        if self.controller:
+            self.controller.tear_down()
         self.controller = event.controller_class(self)
+        self.controller.prepare_layout()
         self.controller.set_up()
 
     def handle_event(self, event):

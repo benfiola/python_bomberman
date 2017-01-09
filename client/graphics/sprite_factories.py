@@ -1,5 +1,6 @@
 import sdl2.ext
 import client.platform_utils as platform_utils
+from .colors import Colors
 
 
 class BaseSpriteFactory(sdl2.ext.SpriteFactory):
@@ -8,14 +9,25 @@ class BaseSpriteFactory(sdl2.ext.SpriteFactory):
         font_path = platform_utils.Platform.get_platform().get_font_path("Arial")
         self.font_manager = sdl2.ext.FontManager(font_path=font_path)
 
-    def color(self, color, layout, **kwargs):
-        sprite = super().from_color(color, layout.absolute_size, **kwargs)
+    def color(self, entity, layout, **kwargs):
+        sprite = super().from_color(entity.color, layout.absolute_size, **kwargs)
         sprite.position = layout.absolute_location
         sprite.depth = layout.depth
+        entity.sdl2_entity.sprite = sprite
         return sprite
 
-    def text(self, text, layout, **kwargs):
-        sprite = super().from_text(text, fontmanager=self.font_manager, **kwargs)
-        sprite.position = layout.absolute_location
+    def text(self, entity, layout, center_x=True, center_y=True, **kwargs):
+        sprite = super().from_text(entity.text, color=entity.color, fontmanager=self.font_manager, **kwargs)
+
+        container_size = layout.absolute_size
+        offset = (int((container_size[0]/2)-(sprite.size[0]/2)), int((container_size[1]/2)-(sprite.size[1]/2)))
+
+        position = layout.absolute_location
+        if center_x:
+            position = (position[0]+offset[0], position[1])
+        if center_y:
+            position = (position[0], position[1]+offset[1])
+        sprite.position = position
         sprite.depth = layout.depth
+        entity.sdl2_entity.sprite = sprite
         return sprite

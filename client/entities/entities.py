@@ -22,10 +22,9 @@ class ClientEntity(object):
         entity._uuid = _uuid
         entity.sdl2_entity = SDL2Entity(controller.world)
         entity.controller.add_entity(entity)
-
         return entity
 
-    def add_sprite(self, sprite):
+    def sprite(self, sprite):
         self.sdl2_entity.sprite = sprite
 
     def __init__(self, controller, *args, **kwargs):
@@ -39,12 +38,13 @@ class ColorEntity(ClientEntity):
 
 
 class LabelEntity(ClientEntity):
-    def __init__(self, controller, text, *args, **kwargs):
+    def __init__(self, controller, text, color, *args, **kwargs):
         super().__init__(controller, *args, **kwargs)
         self.text = text
+        self.color = color
 
 
-class SelectionEntity(ClientEntity):
-    def __init__(self, controller, *args, **kwargs):
-        super().__init__(controller, *args, **kwargs)
+class SelectionEntity(ColorEntity):
+    def __init__(self, controller, color, *args, **kwargs):
+        super().__init__(controller, color, *args, **kwargs)
         self.selected_index = 0
