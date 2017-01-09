@@ -56,7 +56,6 @@ class MainMenuController(Controller):
         for key in self.menu_options.keys():
             self.sprite_factory.text(self.menu_options[key], self.layout.container(key))
 
-        self.client.register_event_handler(events.KeyInputDown, self.on_key_down)
         self.world.add_system(systems.MenuMovementSystem())
         self.world.add_system(systems.SoftwareRenderer(self.client.window))
 
