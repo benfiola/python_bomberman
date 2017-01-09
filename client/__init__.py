@@ -1,1 +1,1 @@
-from .client import Client
+from common.app_logging import logger

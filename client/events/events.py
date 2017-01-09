@@ -1,5 +1,6 @@
 from .keymap import KeyMap, SDL2KeyMap
 
+
 class Event(object):
     def __init__(self):
         pass

@@ -2,10 +2,10 @@ import threading
 from common import *
 from .platform_utils import Platform
 Platform.get_platform().configure_paths()
-
+import logging
 import client.configuration as configuration
 import client.events as events
-import client.controllers as controllers
+import client.controllers.intro as controller
 import sdl2.ext
 import time
 
@@ -28,7 +28,7 @@ class Client(object):
 
         self.window = sdl2.ext.Window("Bomberman", size=self.configuration.screen_resolution.value())
 
-        self.controller_transition(events.ControllerTransition(controllers.IntroController))
+        self.controller_transition(events.ControllerTransition(controller.IntroController))
         self.window.show()
 
     def start_message_bus(self, host_data):

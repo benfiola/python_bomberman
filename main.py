@@ -1,9 +1,9 @@
 import sys
 import time
-from client import Client
+import client.client as client
 
 if __name__ == "__main__":
-    client = Client()
+    client = client.Client()
     client.run()
     sys.exit(0)
 
