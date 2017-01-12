@@ -1,24 +1,16 @@
 from client.controllers import *
+import client.graphics.views.intro as view
 
 
 class IntroController(Controller):
     def __init__(self, client):
-        super().__init__(client)
+        super().__init__(client, view.IntroView)
 
     def set_up(self):
-        super().set_up()
-        self.layout.finalize(self.window_size)
-
-        background_entity = entities.ColorEntity(self, graphics.Colors.BLUE)
-        self.sprite_factory.color(background_entity, self.layout)
-        title_entity = entities.LabelEntity(self, "Bomberman", graphics.Colors.WHITE)
-        self.sprite_factory.text(title_entity, self.layout.container("title"))
-        enter_entity = entities.LabelEntity(self, "Press ENTER to continue.", graphics.Colors.WHITE)
-        self.sprite_factory.text(enter_entity, self.layout.container("enter-message"))
-        esc_entity = entities.LabelEntity(self, "Press ESC to exit.", graphics.Colors.WHITE)
-        self.sprite_factory.text(esc_entity, self.layout.container("esc-message"))
-
-        self.world.add_system(systems.SoftwareRenderer(self.client.window))
+        entities.ClientEntity(self, view_qualifier="background")
+        entities.ClientEntity(self, view_qualifier="title")
+        entities.ClientEntity(self, view_qualifier="enter-message")
+        entities.ClientEntity(self, view_qualifier="esc-message")
 
     def on_key_down(self, key_code):
         if key_code == events.KeyInputEvent.ESC:

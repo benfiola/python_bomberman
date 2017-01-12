@@ -1,7 +1,7 @@
 import time
 
 
-class Velocity(object):
+class Animation(object):
     def __init__(self, velocity_coords, target_coords):
         super().__init__()
         self.velocity_coords = velocity_coords

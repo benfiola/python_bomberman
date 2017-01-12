@@ -2,27 +2,15 @@ import logging
 import sdl2.ext
 import client.entities as entities
 import client.events as events
-import client.graphics as graphics
 import client.systems as systems
-import client.graphics.layouts as layouts
-import os
-import sys
-
 
 class Controller(object):
-    def __init__(self, client, layout_file="layout.xml"):
+    def __init__(self, client, view_class):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.client = client
         self.world = sdl2.ext.World()
-        self.sprite_factory = graphics.BaseSpriteFactory()
-        self.window_size = self.client.window.size
-        self.layout = graphics.LayoutParser.generate_layout(self._get_layout_path(layout_file))
+        self.view = view_class(self.client.window)
         self.entities = {}
-
-    def _get_layout_path(self, layout_file):
-        module_file = sys.modules[self.__module__].__file__
-        module_path = os.path.dirname(os.path.abspath(module_file))
-        return os.path.join(module_path, layout_file)
 
     def _key_down(self, event):
         self.on_key_down(event.key_code)
@@ -30,21 +18,36 @@ class Controller(object):
     def _key_up(self, event):
         self.on_key_up(event.key_code)
 
-    def set_up(self):
+    def _set_up(self):
+        self.view.set_up()
+        self.set_up()
+
         self.client.register_event_handler(events.KeyInputDown, self._key_down)
         self.client.register_event_handler(events.KeyInputUp, self._key_up)
+
+        self.world.add_system(systems.AnimationSystem())
+        self.world.add_system(systems.SoftwareRenderer(self.client.window))
+
+    def _on_entity_change(self, entity, key, value):
+        self.view.on_entity_change(entity, key, value)
+
+    def set_up(self):
+        pass
 
     def tear_down(self):
         self.client.remove_event_handlers(self)
         for entity in list(self.entities.values()):
             self.remove_entity(entity)
+        for system in list(self.world.systems):
+            self.world.remove_system(system)
         self.entities = {}
 
     def process(self):
         self.world.process()
 
     def add_entity(self, entity):
-        self.entities[entity.uuid] = entity
+        self.entities[entity._uuid] = entity
+        self.view.add_entity(entity)
 
     def remove_entity(self, entity):
         entity = self.entities.pop(entity.uuid)

@@ -51,7 +51,7 @@ class Client(object):
         if self.controller:
             self.controller.tear_down()
         self.controller = event.controller_class(self)
-        self.controller.set_up()
+        self.controller._set_up()
 
     def handle_event(self, event):
         evt_cls = event.__class__

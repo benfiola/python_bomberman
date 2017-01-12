@@ -3,16 +3,16 @@ import client.entities as entities
 import time
 
 
-class MenuMovementSystem(sdl2.ext.Applicator):
+class AnimationSystem(sdl2.ext.Applicator):
     def __init__(self):
         super().__init__()
-        self.componenttypes = entities.Velocity, sdl2.ext.Sprite
+        self.componenttypes = entities.Animation, sdl2.ext.Sprite
 
     def process(self, world, components):
-        for velocity, sprite in components:
+        for animation, sprite in components:
             curr_time = time.time()
-            time_diff = curr_time - velocity.last_update
-            vel = (velocity.velocity_coords[0] * time_diff, velocity.velocity_coords[1] * time_diff)
+            time_diff = curr_time - animation.last_update
+            vel = (animation.velocity_coords[0] * time_diff, animation.velocity_coords[1] * time_diff)
             old = sprite.position
             new = (
                 int(old[0] + vel[0]),

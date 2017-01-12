@@ -1,2 +1,2 @@
-from .components import Velocity, BoardPosition
-from .entities import LabelEntity, SelectionEntity, ColorEntity
+from .components import Animation, BoardPosition
+from .entities import ClientEntity

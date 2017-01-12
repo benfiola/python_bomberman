@@ -1,3 +1,3 @@
-from .movement import MenuMovementSystem
+from .animation import AnimationSystem
 from .renderer import SoftwareRenderer
 

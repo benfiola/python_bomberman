@@ -1,4 +1,3 @@
-from client.graphics.colors import Colors
 import sdl2.ext
 
 
