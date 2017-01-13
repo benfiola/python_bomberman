@@ -4,6 +4,7 @@ import client.entities as entities
 import client.events as events
 import client.systems as systems
 
+
 class Controller(object):
     def __init__(self, client, view_class):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -47,11 +48,11 @@ class Controller(object):
 
     def add_entity(self, entity):
         self.entities[entity._uuid] = entity
-        self.view.add_entity(entity)
+        self.view.on_entity_add(entity)
 
     def remove_entity(self, entity):
-        entity = self.entities.pop(entity.uuid)
-        self.world.delete(entity.sdl2_entity)
+        entity = self.entities.pop(entity._uuid)
+        self.world.delete(entity._sdl2_entity)
 
     def on_key_down(self, key_code):
         pass

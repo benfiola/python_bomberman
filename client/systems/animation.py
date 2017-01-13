@@ -19,8 +19,8 @@ class AnimationSystem(sdl2.ext.Applicator):
                 int(old[1] + vel[1])
             )
 
-            if velocity.target_coords:
-                target = velocity.target_coords
+            if animation.target_coords:
+                target = animation.target_coords
                 new_list = list(new)
                 for index in [0, 1]:
                     if old[index] <= target[index] and new[index] >= target[index]:
@@ -30,10 +30,10 @@ class AnimationSystem(sdl2.ext.Applicator):
                 new = tuple(new_list)
 
             sprite.position = new
-            if new == velocity.target_coords:
-                entities = world.get_entities(velocity)
+            if new == animation.target_coords:
+                entities = world.get_entities(animation)
                 for entity in entities:
-                    delattr(entity, "velocity")
+                    delattr(entity, "animation")
 
 
 

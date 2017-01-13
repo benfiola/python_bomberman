@@ -1,6 +1,7 @@
 import client.graphics.layouts as layouts
 import client.graphics.sprite_factories as sprite_factories
 import client.graphics.colors as colors
+import client.entities.components as components
 import os
 import sys
 
@@ -18,23 +19,47 @@ class View(object):
         return os.path.join(module_path, layout_file)
 
     def set_up(self):
-        self.prepare_layout()
         self.layout.finalize(self.window.size)
 
-    def prepare_layout(self):
-        pass
-
-    def add_entity(self, entity):
+    def on_entity_add(self, entity):
         if getattr(entity, "_view_qualifier", None):
             view_qualifier = getattr(entity, "_view_qualifier")
             self.entities[entity._uuid] = entity
-            self.on_entity_add(entity, view_qualifier)
+            self.entity_added(entity, view_qualifier)
 
-    def on_entity_add(self, entity, view_qualifier):
+    def entity_added(self, entity, view_qualifier):
+        pass
+
+    def entity_changed(self, entity, view_qualifier, key, value):
         pass
 
     def on_entity_change(self, entity, key, value):
-        pass
+        view_qualifier = getattr(entity, "_view_qualifier")
+        self.entity_changed(entity, view_qualifier, key, value)
 
+    def animate(self, entity, layout, grid_per_second):
+        """
+        helper function for animations, which is effectively assigning
+        an animation component to an entity's _sdl2_entity.
 
+        we specify the velocity of the animation in 'grids_per_second',
+        meaning 'how many grid spaces in the container will this traverse
+        in one second'.  this is because distance will scale with screen
+        size, and using a typical duration will result in inconsistent
+        animations depending on where the entity currently is.
+        :param entity:
+        :param layout:
+        :param grid_per_second:
+        :return:
+        """
+        v_x = (layout.grid_size[0] * grid_per_second[0])
+        v_y = (layout.grid_size[0] * grid_per_second[1])
+        if entity._sdl2_entity.sprite.position[0] > layout.absolute_location[0]:
+            v_x = -v_x
+        if entity._sdl2_entity.sprite.position[1] > layout.absolute_location[1]:
+            v_y = -v_y
 
+        entity._sdl2_entity.animation = components.Animation(
+            target_coords=layout.absolute_location,
+            velocity_coords=(v_x, v_y)
+        )
