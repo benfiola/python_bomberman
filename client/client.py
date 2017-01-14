@@ -16,7 +16,7 @@ import host.host as host
 class Client(object):
     def __init__(self):
         self.logger = logging.getLogger("client")
-        self.uuid = uuid_lib.uuid4()
+        self.uuid = "client"
         self.event_list = []
         self.event_handlers = {}
         self.event_list_lock = threading.Lock()

@@ -493,7 +493,7 @@ class ConnectionManager(object):
     def identify(self, request, connection):
         with self.connections_lock:
             connection.remote_uuid = request.client_id
-            self.connections_by_id[request.uuid] = connection
+            self.connections_by_id[connection.remote_uuid] = connection
             self.connection_identification_locks[connection.target_address].set()
         self.logger.debug("Identified %s:%d as %s" % (connection.target_address[0], connection.target_address[1], connection.remote_uuid))
 

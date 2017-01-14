@@ -9,16 +9,12 @@ class SinglePlayerView(View):
     DESTRUCTIBLE_WALL = "destructible-wall"
     INDESTRUCTIBLE_WALL = "indestructible-wall"
 
-
     def __init__(self, window):
         super().__init__(window)
 
     def entity_added(self, entity, view_qualifier):
         if view_qualifier == self.BACKGROUND:
             self.sprite_factory.color(entity, self.layout, colors.GRAY)
-        if view_qualifier == self.GAME_CONTAINER:
-            container = self.layout("game-container")
-            self.sprite_factory.color()
 
     def entity_changed(self, entity, view_qualifier, key, value):
         pass

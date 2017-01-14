@@ -3,7 +3,7 @@ import common.messaging.message_bus as message_bus
 import common.messaging.messages as messages
 import uuid as uuid_lib
 import threading
-
+import time
 
 class Host(object):
     def __init__(self, bus, owner, uuid):
@@ -49,6 +49,7 @@ class Host(object):
             events = self.get_events()
             for event in events:
                 self.process_event(event)
+            time.sleep(.1)
         self.logger.info("host shut down")
 
 
@@ -58,7 +59,7 @@ class LocalHost(Host):
 
 
 class MultiplayerHost(Host):
-    def __init__(self, owner, host_port, uuid=uuid_lib.uuid4()):
+    def __init__(self, owner, host_port, uuid="host"):
         super().__init__(message_bus.HostNetworkedMessageBus(uuid, host_port), owner, uuid)
         self.message_bus.start()
 

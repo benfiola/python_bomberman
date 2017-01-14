@@ -27,8 +27,8 @@ class SinglePlayerOptionsController(Controller):
             game_config = game_configuration.GameConfiguration(
                 map, 1, 0
             )
-            self.client.add_event(events.CreateHost(remote_host_data))
-            self.client.add_event(events.StartMessageBus(remote_host_data))
+            self.client.add_event(events.CreateHost(local_host_data))
+            self.client.add_event(events.StartMessageBus(local_host_data))
             self.client.add_event(events.SendRequest(messages.CreateGame(self.client.uuid, game_config)))
             from client.controllers.single_player import SinglePlayerController
             self.client.add_event(events.ControllerTransition(SinglePlayerController))
