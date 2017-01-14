@@ -39,3 +39,21 @@ class ControllerTransition(Event):
         self.controller_class = controller_class
 
 
+class CreateHost(Event):
+    def __init__(self, host_data):
+        super().__init__()
+        self.host_data = host_data
+
+
+class StartMessageBus(Event):
+    def __init__(self, host_data):
+        super().__init__()
+        self.host_data = host_data
+
+
+class StopMessageBus(Event):
+    def __init__(self):
+        super().__init__()
+
+
+

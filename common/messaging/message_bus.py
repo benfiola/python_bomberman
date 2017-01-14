@@ -42,7 +42,7 @@ class LocalMessageBus(MessageBus):
     def __init__(self, bus_uuid):
         super().__init__(bus_uuid)
 
-    def start(self):
+    def start(self, *args):
         super().start()
 
     def stop(self):
@@ -67,7 +67,7 @@ class NetworkedMessageBus(MessageBus):
         self.request_manager = RequestManager(self)
         self.shutting_down = False
 
-        self.register_data_handler(IdentifyRequest, self.connection_manager.identify)
+        self.register_data_handler(Identify, self.connection_manager.identify)
         self.register_data_handler(BaseResponse, self.request_manager.on_response)
 
     def start(self, *args):
@@ -122,20 +122,21 @@ class ClientNetworkedMessageBus(NetworkedMessageBus):
         super().start()
         self.host_address = host_address
         connection = self.connection_manager.open(target_address=self.host_address)
-        self.request_manager.send(IdentifyRequest(self.uuid, connection.source_address), connections=[connection])
+        self.request_manager.send(Identify(self.uuid, connection.source_address), connections=[connection])
         self.connection_manager.wait_until_handshake(connection)
 
     def stop(self):
         super().stop()
+        self.logger.info("client networked message bus stopped")
 
 
 class HostNetworkedMessageBus(NetworkedMessageBus):
-    def __init__(self, bus_uuid):
+    def __init__(self, bus_uuid, host_port):
         """
         A Host message bus is a standard message bus with an additional socket used to listen for new connections.
         """
         super().__init__(bus_uuid)
-        self.listener_address = (socket.gethostname(), 40000)
+        self.listener_address = (socket.gethostname(), host_port)
         self.listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.listener_thread = WorkerThread(name="host-listener-thread", target=self._listen)
@@ -154,6 +155,7 @@ class HostNetworkedMessageBus(NetworkedMessageBus):
             pass
         self.listener_socket.close()
         self.listener_thread.join()
+        self.logger.info("host networked message bus stopped")
 
     def _on_listener_socket_close(self):
         self.shutting_down = True
@@ -166,7 +168,7 @@ class HostNetworkedMessageBus(NetworkedMessageBus):
                 try:
                     (client_socket, client_address) = self.listener_socket.accept()
                     connection = self.connection_manager.open(target_socket=client_socket)
-                    self.request_manager.send(IdentifyRequest(self.uuid, connection.source_address), connections=[connection])
+                    self.request_manager.send(Identify(self.uuid, connection.source_address), connections=[connection])
                     self.connection_manager.wait_until_handshake(connection)
                 except OSError:
                     self._on_listener_socket_close()

@@ -1,1 +1,2 @@
-from .configuration import BaseConfiguration, DefaultConfiguration, Configuration, ConfigurationOption, InputConfigurationOption, PredefinedConfigurationOption, ConfigurationException
+from .global_configuration import BaseConfiguration, DefaultConfiguration, Configuration, ConfigurationOption, InputConfigurationOption, PredefinedConfigurationOption, ConfigurationException
+from .game_configuration import GameConfiguration

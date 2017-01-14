@@ -35,3 +35,15 @@ class MenuContainer(ClientEntity):
     def __init__(self, controller, entities, *args, **kwargs):
         self.entities = entities
         super().__init__(controller, *args, **kwargs)
+
+
+class GameContainer(ClientEntity):
+    def __init__(self, controller, configuration, entities, *args, **kwargs):
+        self.entities = entities
+        super().__init__(controller, *args, **kwargs)
+
+
+class HostData(object):
+    def __init__(self, local, address=None):
+        self.local = local
+        self.address = address

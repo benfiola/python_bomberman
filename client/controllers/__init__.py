@@ -1,5 +1,6 @@
 import logging
 import sdl2.ext
+import common.messaging.messages as messages
 import client.entities as entities
 import client.events as events
 import client.systems as systems
@@ -36,6 +37,10 @@ class Controller(object):
         pass
 
     def tear_down(self):
+        pass
+
+    def _tear_down(self):
+        self.tear_down()
         self.client.remove_event_handlers(self)
         for entity in list(self.entities.values()):
             self.remove_entity(entity)

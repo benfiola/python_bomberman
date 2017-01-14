@@ -1,4 +1,4 @@
-from .configuration import *
+from .global_configuration import *
 import unittest
 import os
 import json

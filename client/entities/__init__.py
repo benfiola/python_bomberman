@@ -1,2 +1,2 @@
 from .components import Animation, BoardPosition
-from .entities import ClientEntity, MenuContainer, SelectionEntity
+from .entities import *

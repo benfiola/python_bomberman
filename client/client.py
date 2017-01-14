@@ -6,37 +6,64 @@ import logging
 import client.configuration as configuration
 import client.events as events
 import client.controllers.intro as controller
+import common.messaging.message_bus as message_bus
 import sdl2.ext
 import time
+import uuid as uuid_lib
+import host.host as host
 
 
 class Client(object):
     def __init__(self):
         self.logger = logging.getLogger("client")
+        self.uuid = uuid_lib.uuid4()
         self.event_list = []
         self.event_handlers = {}
         self.event_list_lock = threading.Lock()
         self.shutting_down = False
-        self.message_bus = None
+        self.local_message_bus = message_bus.LocalMessageBus(self.uuid)
+        self.remote_message_bus = message_bus.ClientNetworkedMessageBus(self.uuid)
         self.controller = None
+        self.host = None
         self.platform = Platform.get_platform()
         self.configuration = configuration.ClientConfiguration()
         self.fps_counter = FPSCounter()
 
         self.register_event_handler(events.Quit, self.begin_shut_down)
         self.register_event_handler(events.ControllerTransition, self.controller_transition)
+        self.register_event_handler(events.CreateHost, self.create_host)
+        self.register_event_handler(events.StartMessageBus, self.start_message_bus)
+        self.register_event_handler(events.StopMessageBus, self.stop_message_bus)
+        self.register_event_handler(events.SendRequest, self.send_message)
 
         self.window = sdl2.ext.Window("Bomberman", size=self.configuration.screen_resolution.value())
 
         self.add_event(events.ControllerTransition(controller.IntroController))
         self.window.show()
 
-    def start_message_bus(self, host_data):
-        self.message_bus.start(host_data)
+    def create_host(self, event):
+        host_data = event.host_data
+        if host_data.local:
+            self.host = host.LocalHost(self.local_message_bus)
+        else:
+            self.host = host.MultiplayerHost(self.uuid, host_data.address[1])
 
-    def stop_message_bus(self):
+    def start_message_bus(self, event):
+        host_data = event.host_data
+        if host_data.local:
+            self.message_bus = self.local_message_bus
+        else:
+            self.message_bus = self.remote_message_bus
+        self.message_bus.start(host_data.address)
+
+    def stop_message_bus(self, event=None):
+        if self.host:
+            self.host.stop()
         self.message_bus.stop()
         self.remove_event_handlers(self.message_bus)
+
+    def send_message(self, event):
+        self.message_bus.send(event.request)
 
     def begin_shut_down(self, _):
         self.shutting_down = True
@@ -44,12 +71,12 @@ class Client(object):
     def shut_down(self):
         if self.message_bus is not None:
             self.stop_message_bus()
-        self.controller.tear_down()
+        self.controller._tear_down()
         self.remove_event_handlers(self)
 
     def controller_transition(self, event):
         if self.controller:
-            self.controller.tear_down()
+            self.controller._tear_down()
         self.controller = event.controller_class(self)
         self.controller._set_up()
 

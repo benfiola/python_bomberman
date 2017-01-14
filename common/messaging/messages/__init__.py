@@ -14,13 +14,13 @@ class BaseRequest(BaseMessage):
         self.requires_response = True
 
 
-class PrintRequest(BaseRequest):
+class Print(BaseRequest):
     def __init__(self, message):
         super().__init__()
         self.message = message
 
 
-class IdentifyRequest(BaseRequest):
+class Identify(BaseRequest):
     def __init__(self, client_id, target_address):
         super().__init__()
         self.client_id = client_id
@@ -42,6 +42,13 @@ class RequestFail(BaseResponse):
 class RequestSuccess(BaseResponse):
     def __init__(self, request_id):
         super().__init__(request_id)
+
+
+class CreateGame(BaseRequest):
+    def __init__(self, client_id, configuration):
+        super().__init__()
+        self.client_id = client_id
+        self.configuration = configuration
 
 
 class IncomingRequest(BaseMessage):

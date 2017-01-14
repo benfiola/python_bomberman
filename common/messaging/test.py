@@ -40,7 +40,7 @@ class TestMessageBus(unittest.TestCase):
         # we'll make sure each side receives the correct number of requests.
 
         # start with the host broadcasting a message to all clients.
-        self.host.send(PrintRequest("Host says hi."))
+        self.host.send(Print("Host says hi."))
         self.assertEquals(self.host.num_received(), host_transactions)
         for client in self.clients:
             client_transactions[client] += 1
@@ -49,7 +49,7 @@ class TestMessageBus(unittest.TestCase):
         # now let's have clients send a message back to the host.
         for num in range(0, len(self.clients)):
             client = self.clients[num]
-            client.send(PrintRequest("Client %d says hi." % num))
+            client.send(Print("Client %d says hi." % num))
             host_transactions += 1
             self.assertEquals(self.host.num_received(), host_transactions)
 
@@ -59,7 +59,7 @@ class InstrumentedClientMessageBus(ClientNetworkedMessageBus):
         super().__init__("client-%d" % number)
         self.received_data = []
         self.register_data_handler(BaseMessage, self.collect)
-        self.register_data_handler(PrintRequest, self.print)
+        self.register_data_handler(Print, self.print)
 
     def collect(self, data, connection):
         if isinstance(data, RequestFail):
@@ -79,7 +79,7 @@ class InstrumentedHostMessageBus(HostNetworkedMessageBus):
         super().__init__("host")
         self.received_data = []
         self.register_data_handler(BaseMessage, self.collect)
-        self.register_data_handler(PrintRequest, self.print)
+        self.register_data_handler(Print, self.print)
 
     def collect(self, data, connection):
         if isinstance(data, RequestFail):

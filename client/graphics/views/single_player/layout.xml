@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<container c="8" r="8" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="pb ../../graphics/layout.xsd" xmlns="pb">
+    <container x="1" y="1" w="6" h="6" tag="game-container" />
+</container>
