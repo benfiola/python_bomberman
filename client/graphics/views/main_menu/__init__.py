@@ -48,8 +48,8 @@ class MainMenuView(View):
                 if option_qualifier == self.MENU_EXIT:
                     self.sprite_factory.text(menu_option, "Exit", layout, colors.WHITE)
 
-    def entity_changed(self, entity, view_qualifier, key, value):
+    def entity_changed(self, entity, view_qualifier, key, value, old_value):
         if view_qualifier == self.MENU_SELECTION:
             menu_grid = self.layout.container(tag="menu-option-layer")
             layout = menu_grid.container(location=(0, entity.selected_index))
-            self.animate(entity, layout, (0, 1))
+            self.animate(entity, layout, (0, .2), boundary=menu_grid)

@@ -30,14 +30,14 @@ class View(object):
     def entity_added(self, entity, view_qualifier):
         pass
 
-    def entity_changed(self, entity, view_qualifier, key, value):
+    def entity_changed(self, entity, view_qualifier, key, value, old_value):
         pass
 
-    def on_entity_change(self, entity, key, value):
+    def on_entity_change(self, entity, key, value, old_value):
         view_qualifier = getattr(entity, "_view_qualifier")
-        self.entity_changed(entity, view_qualifier, key, value)
+        self.entity_changed(entity, view_qualifier, key, value, old_value)
 
-    def animate(self, entity, layout, grid_per_second):
+    def animate(self, entity, layout, grid_per_second, boundary=None):
         """
         helper function for animations, which is effectively assigning
         an animation component to an entity's _sdl2_entity.
@@ -54,12 +54,17 @@ class View(object):
         """
         v_x = (layout.grid_size[0] * grid_per_second[0])
         v_y = (layout.grid_size[0] * grid_per_second[1])
-        if entity._sdl2_entity.sprite.position[0] > layout.absolute_location[0]:
-            v_x = -v_x
-        if entity._sdl2_entity.sprite.position[1] > layout.absolute_location[1]:
-            v_y = -v_y
+        clipping_container = None
+        if True:
+            if entity._sdl2_entity.sprite.position[0] > layout.absolute_location[0]:
+                v_x = -v_x
+            if entity._sdl2_entity.sprite.position[1] > layout.absolute_location[1]:
+                v_y = -v_y
+        else:
+            clipping_container = (*boundary.absolute_location, *boundary.absolute_size)
 
         entity._sdl2_entity.animation = components.Animation(
             target_coords=layout.absolute_location,
-            velocity_coords=(v_x, v_y)
+            velocity_coords=(v_x, v_y),
+            clipping_container=clipping_container
         )

@@ -21,6 +21,7 @@ class Client(object):
         self.event_handlers = {}
         self.event_list_lock = threading.Lock()
         self.shutting_down = False
+        self.message_bus = None
         self.local_message_bus = message_bus.LocalMessageBus(self.uuid)
         self.remote_message_bus = message_bus.ClientNetworkedMessageBus(self.uuid)
         self.controller = None

@@ -30,8 +30,8 @@ class Controller(object):
         self.world.add_system(systems.AnimationSystem())
         self.world.add_system(systems.SoftwareRenderer(self.client.window))
 
-    def _on_entity_change(self, entity, key, value):
-        self.view.on_entity_change(entity, key, value)
+    def _on_entity_change(self, entity, key, value, old_value):
+        self.view.on_entity_change(entity, key, value, old_value)
 
     def set_up(self):
         pass
