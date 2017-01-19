@@ -52,4 +52,4 @@ class MainMenuView(View):
         if view_qualifier == self.MENU_SELECTION:
             menu_grid = self.layout.container(tag="menu-option-layer")
             layout = menu_grid.container(location=(0, entity.selected_index))
-            self.animate(entity, layout, (0, .2), boundary=menu_grid)
+            self.animate(entity, layout, (0, 1))

@@ -26,8 +26,7 @@ class AnimationSystem(sdl2.ext.Applicator):
             for index in [0, 1]:
                 if (old[index] - target[index]) ^ (new[index] - target[index]) < 0:
                     new_list[index] = target[index]
-            new = tuple(new_list)
-            sprite.position = new
+            sprite.position = tuple(new_list)
             if new == animation.target_coords:
                 delattr(entity, "animation")
 
