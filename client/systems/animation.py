@@ -20,15 +20,21 @@ class AnimationSystem(sdl2.ext.Applicator):
                 int(old[0] + vel[0]),
                 int(old[1] + vel[1])
             )
-
             target = animation.target_coords
             new_list = list(new)
             for index in [0, 1]:
-                if (old[index] - target[index]) ^ (new[index] - target[index]) < 0:
+                if ((old[index] - target[index]) ^ (new[index] - target[index])) < 0:
                     new_list[index] = target[index]
-            sprite.position = tuple(new_list)
+
+            new = tuple(new_list)
+            sprite.position = new
             if new == animation.target_coords:
-                delattr(entity, "animation")
+                if animation.chain is None:
+                    delattr(entity, "animation")
+                else:
+                    (start_position, animation_function) = animation.chain
+                    sprite.position = start_position
+                    animation_function()
 
 
 

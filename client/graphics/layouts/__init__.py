@@ -18,6 +18,7 @@ class Container(BaseXMLElement):
         self.tag = tag
         self.dimensions = dimensions if dimensions else (1, 1)
         self.depth = depth
+        self.max_depth = depth
         self.children = []
         self.tagged_containers = {}
         self.parent = None
@@ -25,6 +26,9 @@ class Container(BaseXMLElement):
         self.absolute_location = None
         self.absolute_size = None
         self._finalized = False
+
+    def area(self):
+        return (*self.absolute_location, *self.absolute_size)
 
     def set_dimensions(self, value):
         """
@@ -101,6 +105,7 @@ class Container(BaseXMLElement):
                 (self.calculate_location(child)),
                 depth=self.depth+1
             )
+            self.max_depth = max(self.max_depth, child.max_depth)
         return child
 
     def container(self, tag=None, location=None):
@@ -144,13 +149,15 @@ class Container(BaseXMLElement):
         self.grid_size = (pixel_dimensions[0] / self.dimensions[0], pixel_dimensions[1] / self.dimensions[1])
         self._finalized = True
 
+        max_depth = self.depth
         for child in self.children:
             child.finalize(
                 (self.calculate_size(child)),
                 (self.calculate_location(child)),
                 depth=depth+1
             )
-
+            max_depth = max(max_depth, child.max_depth)
+        self.max_depth = max_depth
         return self
 
     def validate(self):

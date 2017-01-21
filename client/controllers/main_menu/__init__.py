@@ -18,6 +18,7 @@ class MainMenuController(Controller):
         entities.ClientEntity(self, view_qualifier=view.MainMenuView.BACKGROUND)
         entities.ClientEntity(self, view_qualifier=view.MainMenuView.TITLE)
         entities.MenuContainer(self, self.menu_options, view_qualifier=view.MainMenuView.MENU_CONTAINER)
+        entities.ClientEntity(self, view_qualifier=view.MainMenuView.MENU_MASK)
         self.selection = entities.SelectionEntity(self, view_qualifier=view.MainMenuView.MENU_SELECTION)
 
     def on_key_down(self, key_code):

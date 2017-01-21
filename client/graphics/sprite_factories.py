@@ -8,7 +8,9 @@ class BaseSpriteFactory(sdl2.ext.SpriteFactory):
         font_path = platform_utils.Platform.get_platform().get_font_path("Arial")
         self.font_manager = sdl2.ext.FontManager(font_path=font_path)
 
-    def color(self, entity, layout, color, **kwargs):
+    def color(self, entity, layout, color, clear=False, **kwargs):
+        if clear:
+            kwargs["masks"] = (0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF)
         sprite = super().from_color(color, layout.absolute_size, **kwargs)
         sprite.position = layout.absolute_location
         sprite.depth = layout.depth

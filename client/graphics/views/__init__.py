@@ -37,7 +37,7 @@ class View(object):
         view_qualifier = getattr(entity, "_view_qualifier")
         self.entity_changed(entity, view_qualifier, key, value, old_value)
 
-    def animate(self, entity, layout, grid_per_second):
+    def animate(self, entity, layout, grid_per_second, chain=None):
         """
         helper function for animations, which is effectively assigning
         an animation component to an entity's _sdl2_entity.
@@ -53,7 +53,7 @@ class View(object):
         :return:
         """
         v_x = (layout.grid_size[0] * grid_per_second[0])
-        v_y = (layout.grid_size[0] * grid_per_second[1])
+        v_y = (layout.grid_size[1] * grid_per_second[1])
         if entity._sdl2_entity.sprite.position[0] > layout.absolute_location[0]:
             v_x = -v_x
         if entity._sdl2_entity.sprite.position[1] > layout.absolute_location[1]:
@@ -61,5 +61,11 @@ class View(object):
 
         entity._sdl2_entity.animation = components.Animation(
             target_coords=layout.absolute_location,
-            velocity_coords=(v_x, v_y)
+            velocity_coords=(v_x, v_y),
+            chain=chain
         )
+
+    def generate_animation_chain(self, entity, layout, grid_per_second, starting_layout=None):
+        def wrapper():
+            self.animate(entity, layout, grid_per_second)
+        return starting_layout.absolute_location, wrapper
